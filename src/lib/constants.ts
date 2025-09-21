@@ -1,0 +1,125 @@
+export const carBrands = [
+    "Toyota",
+    "Kia",
+    "Hyundai",
+    "Nissan",
+    "Chevrolet",
+    "Suzuki",
+    "Volkswagen",
+    "Mitsubishi",
+    "Ford",
+    "Renault",
+    "BMW",
+    "Mercedes Benz",
+    "Audi",
+    "Jeep",
+    "Land Rover",
+    "Volvo",
+    "BAIC",
+    "Brilliance",
+    "BYD",
+    "Changan",
+    "Chery",
+    "DFSK",
+    "Dongfeng",
+    "FAW",
+    "Foton",
+    "Geely",
+    "Great Wall",
+    "Haval",
+    "JAC",
+    "Jinbei",
+    "Joylong",
+    "Kenbo",
+    "Otro", // Option to write a custom one
+];
+
+export const serviceAreas = [
+    "MEDICINA GENERAL",
+    "PEDIATRÍA",
+    "LABORATORIO",
+    "PHD",
+    "PRECISA",
+    "C.C.CHACARILLA",
+    "CRÓNICO",
+    "ASEGURABILIDAD",
+    "C.EL GOLF",
+    "C.SAN BORJA",
+    "CC.LA MOLINA",
+    "JP",
+    "SM",
+];
+
+export const serviceTypes = [
+    "MAD",
+    "MAD SANNA",
+    "MAD-CI",
+    "LABORATORIO CI",
+    "CI",
+    "FAD",
+    "TAD",
+    "AMI",
+    "TDP CEG/GSB",
+    "RDM",
+    "RDM C.CLINICOS",
+    "MEDICINA",
+    "RETEN",
+    "APOYO",
+    "CANCELADO",
+];
+
+export const driverAbsenceLevels = {
+    1: "Permiso por asunto personal y/o familiar = Leve",
+    2: "Permiso por enfermedad personal y/o familiar = Normal",
+    3: "Unidad Fallo en último momento = Mediano leve",
+    4: "Unidad en Taller = Mediano",
+    5: "No salió al turno sin avisar o se reportó muy tarde = Grave",
+};
+
+export const driverRatingLevels = {
+    1: "Puntual y/o antes de 5 minutos.",
+    2: "Puntual y/o después de 5 minutos.",
+    3: "Puntuación Intermitente.",
+    4: "Tardanza leve entre de 6 a 20 minutos.",
+    5: "Tardanza grave 20 minutos a 1 hora.",
+};
+
+export const driverShifts = [
+    "TURNO MAÑANA",
+    "TURNO TARDE",
+    "TURNO MAÑANA Y TARDE",
+    "TURNO NOCHE",
+    "TURNO CORRIDO",
+    "TURNO VARIADO",
+    "TURNO POR HORAS",
+    "SIN SERVICIO",
+    "PERMISO DESCANSO",
+    "TRABAJA FERIADOS",
+    "SÁBADOS Y DOMINGOS",
+    "RETIRADO",
+];
+
+export const specialties = [
+    "INTERNISTA",
+    "MEDICINA GENERAL",
+    "PSICOONCOLOGÍA",
+    "TERAPIA",
+    "TERAPIA DE LENGUAJE",
+    "NUTRICIÓN",
+    "AGUDO",
+    "C.I.",
+    "S.M.",
+    "M",
+];
+
+export const districts = [
+    "Ancón", "Ate", "Barranco", "Breña", "Carabayllo", "Chaclacayo", "Chorrillos",
+    "Cieneguilla", "Comas", "El Agustino", "Independencia", "Jesús María",
+    "La Molina", "La Victoria", "Lima", "Lince", "Los Olivos", "Chosica",
+    "Lurín", "Magdalena del Mar", "Miraflores", "Pachacámac", "Pucusana",
+    "Pueblo Libre", "Puente Piedra", "Punta Hermosa", "Punta Negra", "Rímac",
+    "San Bartolo", "San Borja", "San Isidro", "San Juan de Lurigancho",
+    "San Juan de Miraflores", "San Luis", "San Martin de Porres", "San Miguel",
+    "Santa Anita", "Santa María del Mar", "Santa Rosa", "Santiago de Surco",
+    "Surquillo", "Villa el Salvador", "Villa María del Triunfo",
+];

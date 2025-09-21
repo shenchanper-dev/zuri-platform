@@ -1,0 +1,18 @@
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+
+export default function ReportesPage() {
+  return (
+    <div className="flex flex-col gap-6 text-[hsl(var(--v2-foreground))]">
+      <h1 className="text-3xl font-bold">Reportes</h1>
+      <Card className="bg-[hsl(var(--v2-card))] border-[hsl(var(--v2-border))]">
+        <CardHeader>
+            <CardTitle>Generación de Reportes</CardTitle>
+            <CardDescription>Esta sección está en desarrollo.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <p>Aquí podrá generar y visualizar reportes detallados.</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
