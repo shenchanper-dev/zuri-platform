@@ -11,13 +11,15 @@ jobs:
     
     steps:
     - name: Deploy via SSH
-      uses: appleboy/ssh-action@v1.0.0
+      uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
+        port: 22
         script: |
           cd /home/zuri/zuri-platform
           git pull origin main
+          npm ci --legacy-peer-deps
           pm2 restart zuri-dev
-          echo "Deploy completed at $(date)"
+          echo "Deploy completed successfully"
