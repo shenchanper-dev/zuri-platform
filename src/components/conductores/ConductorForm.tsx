@@ -6,12 +6,11 @@ import type { Conductor, CrearConductorDTO } from '@/domain/entities/Conductor.e
 // 🛡️ TYPES & PROPS
 // ==========================================
 interface Props {
-  conductorEditar?: Conductor | null; // Si es null, es modo CREAR
+  conductorEditar?: Conductor | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-// Estado inicial limpio
 const INITIAL_STATE: CrearConductorDTO = {
   nombres: '',
   apellidos: '',
@@ -27,39 +26,30 @@ const INITIAL_STATE: CrearConductorDTO = {
   colorAuto: '',
   distrito_nombre: '',
   direccionCompleta: '',
-  latitud: -12.046374, // Default Lima Centro
+  latitud: -12.046374,
   longitud: -77.042793,
   referencia: '',
   estado: 'PENDIENTE'
 };
 
 export default function ConductorForm({ conductorEditar, onClose, onSuccess }: Props) {
-  // ==========================================
-  // 🎣 HOOKS & STATE
-  // ==========================================
   const { crearConductor, actualizarConductor, loading, error: apiError, limpiarError } = useConductores();
   
   const [formData, setFormData] = useState<CrearConductorDTO>(INITIAL_STATE);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isEditMode, setIsEditMode] = useState(false);
 
-  // ==========================================
-  // 🔄 EFECTOS
-  // ==========================================
-  
-  // Cargar datos si estamos en modo EDICIÓN
   useEffect(() => {
     if (conductorEditar) {
       setIsEditMode(true);
-      // Mapeo seguro de datos existentes al formulario
       setFormData({
         nombres: conductorEditar.nombres || '',
         apellidos: conductorEditar.apellidos || '',
         dni: conductorEditar.dni || '',
         celular1: conductorEditar.celular1 || '',
         email: conductorEditar.email || '',
-        // Manejo de compatibilidad de nombres de campo (API vs DTO)
-        licencia_numero: conductorEditar.licencia_numero || (conductorEditar as any).numeroBrevete || '',
+        // 🛠️ FIX 1: Forzamos que siempre sea un String para evitar fallos de .trim()
+        licencia_numero: String(conductorEditar.licencia_numero || (conductorEditar as any).numeroBrevete || '').trim(),
         placaVehiculo: conductorEditar.placaVehiculo || '',
         marcaAuto: conductorEditar.marcaAuto || '',
         modeloAuto: conductorEditar.modeloAuto || '',
@@ -75,17 +65,12 @@ export default function ConductorForm({ conductorEditar, onClose, onSuccess }: P
       setIsEditMode(false);
       setFormData(INITIAL_STATE);
     }
-    limpiarError(); // Limpiar errores previos del hook
+    limpiarError();
   }, [conductorEditar, limpiarError]);
-
-  // ==========================================
-  // ⚙️ LOGICA DE NEGOCIO UI
-  // ==========================================
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
-    // 1. Limpieza automática de errores al escribir
     if (formErrors[name]) {
       setFormErrors(prev => {
         const newErrors = { ...prev };
@@ -94,19 +79,18 @@ export default function ConductorForm({ conductorEditar, onClose, onSuccess }: P
       });
     }
 
-    // 2. Transformaciones de input (UX Mejorada)
     let finalValue: string | number = value;
-
-    if (name === 'placaVehiculo') finalValue = value.toUpperCase().replace(/[^A-Z0-9-]/g, ''); // Solo Mayus y Números
-    if (name === 'dni') finalValue = value.replace(/\D/g, '').slice(0, 8); // Solo números, max 8
-    if (name === 'celular1') finalValue = value.replace(/\D/g, '').slice(0, 9); // Solo números, max 9
+    if (name === 'placaVehiculo') finalValue = value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    if (name === 'dni') finalValue = value.replace(/\D/g, '').slice(0, 8);
+    if (name === 'celular1') finalValue = value.replace(/\D/g, '').slice(0, 9);
+    // 🛠️ FIX 2: Autocorrección de Licencia mientras escribes
+    if (name === 'licencia_numero') finalValue = value.toUpperCase().trim();
 
     setFormData(prev => ({ ...prev, [name]: finalValue }));
   };
 
   const handleGeoLocation = () => {
     if (!navigator.geolocation) return alert('Geolocalización no soportada');
-    
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setFormData(prev => ({
@@ -119,9 +103,6 @@ export default function ConductorForm({ conductorEditar, onClose, onSuccess }: P
     );
   };
 
-  // ==========================================
-  // ✅ VALIDACIÓN LOCAL (Ahorra llamadas a API)
-  // ==========================================
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
     
@@ -129,7 +110,13 @@ export default function ConductorForm({ conductorEditar, onClose, onSuccess }: P
     if (!formData.nombres.trim()) errors.nombres = 'Nombres requeridos';
     if (!formData.apellidos.trim()) errors.apellidos = 'Apellidos requeridos';
     if (formData.celular1.length !== 9) errors.celular1 = 'Celular debe tener 9 dígitos';
-    if (!formData.licencia_numero.trim()) errors.licencia_numero = 'Licencia requerida';
+    
+    // 🛠️ FIX 3: Validación Ultra-Robusta para la Licencia
+    const lic = String(formData.licencia_numero || '').trim();
+    if (!lic || lic.length < 3) {
+      errors.licencia_numero = 'Número de licencia es obligatorio';
+    }
+
     if (!formData.placaVehiculo.trim()) errors.placaVehiculo = 'Placa requerida';
     if (!formData.email.includes('@')) errors.email = 'Email inválido';
 
@@ -141,10 +128,8 @@ export default function ConductorForm({ conductorEditar, onClose, onSuccess }: P
     e.preventDefault();
     if (!validateForm()) return;
 
-    // Construcción del objeto final (Uniendo nombre completo para compatibilidad si es necesario)
     const payload = {
       ...formData,
-      // Asegurar números en coordenadas
       latitud: Number(formData.latitud),
       longitud: Number(formData.longitud),
     };
@@ -157,21 +142,14 @@ export default function ConductorForm({ conductorEditar, onClose, onSuccess }: P
     }
 
     if (result.success) {
-      onSuccess(); // Cerrar modal y refrescar lista
+      onSuccess();
       onClose();
     }
-    // Si falla, el hook actualiza `apiError` y se muestra en el render
   };
 
-  // ==========================================
-  // 🎨 RENDER
-  // ==========================================
-  console.log("Datos actuales del formulario:", formData);
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        
-        {/* HEADER */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-xl font-bold text-gray-800">
             {isEditMode ? '✏️ Editar Conductor' : '🆕 Nuevo Conductor'}
@@ -180,8 +158,6 @@ export default function ConductorForm({ conductorEditar, onClose, onSuccess }: P
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          
-          {/* ERROR ALERT */}
           {(apiError || Object.keys(formErrors).length > 0) && (
             <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded mb-4">
               <div className="flex">
@@ -197,7 +173,6 @@ export default function ConductorForm({ conductorEditar, onClose, onSuccess }: P
             </div>
           )}
 
-          {/* SECCIÓN 1: DATOS PERSONALES */}
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 border-b pb-1">
               👤 Datos Personales
@@ -211,7 +186,6 @@ export default function ConductorForm({ conductorEditar, onClose, onSuccess }: P
             </div>
           </div>
 
-          {/* SECCIÓN 2: DATOS DEL VEHÍCULO */}
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 border-b pb-1">
               🚗 Unidad y Legal
@@ -225,7 +199,6 @@ export default function ConductorForm({ conductorEditar, onClose, onSuccess }: P
             </div>
           </div>
 
-          {/* SECCIÓN 3: UBICACIÓN */}
           <div>
             <div className="flex justify-between items-center border-b pb-1 mb-3">
               <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">📍 Ubicación</h3>
@@ -241,42 +214,20 @@ export default function ConductorForm({ conductorEditar, onClose, onSuccess }: P
             </div>
           </div>
 
-          {/* FOOTER ACTIONS */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium transition-colors"
-              disabled={loading}
-            >
+            <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium" disabled={loading}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className={`px-6 py-2.5 rounded-lg text-white font-medium shadow-md transition-all flex items-center ${
-                loading ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg'
-              }`}
-            >
-              {loading && (
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              )}
-              {loading ? 'Guardando...' : isEditMode ? 'Actualizar Conductor' : 'Crear Conductor'}
+            <button type="submit" disabled={loading} className={`px-6 py-2.5 rounded-lg text-white font-medium shadow-md flex items-center ${loading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}`}>
+              {loading ? 'Guardando...' : isEditMode ? 'Actualizar' : 'Crear Conductor'}
             </button>
           </div>
-
         </form>
       </div>
     </div>
   );
 }
 
-// ==========================================
-// 🧩 SUB-COMPONENTE: INPUT REUTILIZABLE
-// ==========================================
 interface InputGroupProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   error?: string;
@@ -288,14 +239,8 @@ const InputGroup = ({ label, error, className = '', ...props }: InputGroupProps)
     <label className="text-sm font-medium text-gray-700 mb-1">{label}</label>
     <input
       {...props}
-      className={`
-        w-full px-3 py-2 rounded-lg border transition-colors outline-none focus:ring-2
-        ${error 
-          ? 'border-red-300 focus:border-red-500 focus:ring-red-200 bg-red-50' 
-          : 'border-gray-300 focus:border-blue-500 focus:ring-blue-100 bg-white'
-        }
-        disabled:bg-gray-100 disabled:text-gray-500
-      `}
+      autoComplete="off"
+      className={`w-full px-3 py-2 rounded-lg border outline-none focus:ring-2 ${error ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'}`}
     />
     {error && <span className="text-xs text-red-500 mt-1 font-medium">{error}</span>}
   </div>
