@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "studio-1582397371-bd74b"
+  },
+  "targets": {
+    "studio-1582397371-bd74b": {
+      "hosting": {
+        "production": [
+          "zuri-pe"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

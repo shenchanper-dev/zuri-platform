@@ -1,0 +1,423 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// MODELO CONDUCTORES (COMPLETO - GPS + ADMIN)
+// ========================================
+model Conductor {
+  id                Int      @id @default(autoincrement())
+  
+  // ========================================
+  // INFORMACIÓN PERSONAL (Solo DNI obligatorio)
+  // ========================================
+  dni               String   @unique @db.VarChar(8)
+  nombres           String?  @db.VarChar(100)
+  apellidos         String?  @db.VarChar(100)
+  nombreCompleto    String?  @db.VarChar(200)
+  fecha_nacimiento  DateTime? @db.Date
+  edad              Int?
+  sexo              String?  @db.VarChar(10)
+  
+  // ========================================
+  // CONTACTO Y UBICACIÓN (CRÍTICO PARA GPS TRACKING)
+  // ========================================
+  telefono          String?  @db.VarChar(15)
+  celular1          String?  @db.VarChar(15)
+  celular2          String?  @db.VarChar(15)
+  telefono_emergencia String? @db.VarChar(15)
+  email             String?  @db.VarChar(100)
+  
+  // Dirección del conductor (casa) - CRÍTICO PARA TRACKING
+  direccion         String?  @db.Text
+  distrito          String?  @db.VarChar(100)
+  distritoId        Int?
+  distritoRel       Distrito? @relation(fields: [distritoId], references: [id])
+  
+  // ========================================
+  // COORDENADAS GPS DE LA CASA (PUNTO BASE)
+  // ========================================
+  latitud           Decimal? @db.Decimal(10, 8)
+  longitud          Decimal? @db.Decimal(11, 8)
+  
+  // Geolocalización TIEMPO REAL (actualizada desde la app)
+  latitud_actual    Float?
+  longitud_actual   Float?
+  ultimaUbicacion   DateTime?
+  precision         Float?    // metros
+  velocidad         Float?    // km/h
+  rumbo             Float?    // 0-360 grados
+  bateria           Int?      // % batería móvil
+  
+  // ========================================
+  // LICENCIAS Y CERTIFICACIONES
+  // ========================================
+  // Licencia de Conducir
+  licencia_numero            String?  @unique @db.VarChar(20)
+  numeroBrevete              String?  @db.VarChar(20)
+  licencia_categoria         String?  @db.VarChar(10) // A-I, A-II, A-III
+  fecha_emision_licencia     DateTime? @db.Date
+  fecha_vencimiento_licencia DateTime? @db.Date
+  puntos_licencia            Int?     @default(100)
+  
+  // Certificaciones Profesionales
+  certificado_transporte     Boolean  @default(false)
+  cert_transporte_numero     String?  @db.VarChar(50)
+  cert_transporte_venc       DateTime? @db.Date
+  
+  tecnico_emergencias        Boolean  @default(false)
+  tes_numero                 String?  @db.VarChar(50)
+  tes_vencimiento            DateTime? @db.Date
+  
+  // Certificados Médicos y Legales
+  certificado_medico         Boolean  @default(false)
+  cert_medico_numero         String?  @db.VarChar(50)
+  fecha_vencimiento_medico   DateTime? @db.Date
+  
+  antecedentes_penales       Boolean  @default(false)
+  cert_penales_fecha         DateTime? @db.Date
+  cert_penales_vigente       Boolean  @default(false)
+  
+  antecedentes_policiales    Boolean  @default(false)
+  cert_policiales_fecha      DateTime? @db.Date
+  cert_policiales_vigente    Boolean  @default(false)
+  
+  // ========================================
+  // CAPACITACIÓN
+  // ========================================
+  primeros_auxilios          Boolean  @default(false)
+  cert_auxilios_fecha        DateTime? @db.Date
+  cert_auxilios_vigente      Boolean  @default(false)
+  
+  soporte_vital_basico       Boolean  @default(false)
+  svb_fecha                  DateTime? @db.Date
+  svb_vigente                Boolean  @default(false)
+  
+  soporte_vital_avanzado     Boolean  @default(false)
+  sva_fecha                  DateTime? @db.Date
+  sva_vigente                Boolean  @default(false)
+  
+  curso_covid                Boolean  @default(false)
+  curso_pacientes_especiales Boolean  @default(false)
+  curso_manejo_defensivo     Boolean  @default(false)
+  
+  // ========================================
+  // VEHÍCULO ASIGNADO
+  // ========================================
+  vehiculo_asignado_id       Int?
+  vehiculo_placa             String?  @db.VarChar(10)
+  placa                      String?  @db.VarChar(10)
+  tipo_vehiculo              String?  @db.VarChar(50)
+  marcaAuto                  String?  @db.VarChar(50)
+  modelo                     String?  @db.VarChar(50)
+  propietario                String?  @db.VarChar(100)
+  fecha_asignacion           DateTime? @db.Date
+  
+  // ========================================
+  // OPERACIÓN Y DISPONIBILIDAD
+  // ========================================
+  distrito_operacion         String?  @db.VarChar(100)
+  distrito_operacion_id      Int?
+  
+  // Disponibilidad horaria (JSON)
+  disponibilidad             Json?
+  
+  // Estados
+  estado                     EstadoConductor @default(ACTIVO)
+  estadoServicio             EstadoTracking  @default(DESCONECTADO)
+  estado_texto               String?  @default("ACTIVO") @db.VarChar(20)
+  
+  motivo_inactividad         String?  @db.Text
+  fecha_ultima_actualizacion DateTime @default(now()) @updatedAt
+  
+  // ========================================
+  // MÉTRICAS Y EVALUACIÓN
+  // ========================================
+  total_servicios            Int      @default(0)
+  total_kilometros           Decimal? @db.Decimal(10, 2)
+  calificacion_promedio      Decimal? @db.Decimal(3, 2) @default(0.00)
+  total_evaluaciones         Int      @default(0)
+  
+  // Historial
+  fecha_ingreso              DateTime @default(now())
+  ultima_evaluacion          DateTime? @db.Date
+  proxima_evaluacion         DateTime? @db.Date
+  
+  // Incidentes
+  total_incidentes           Int      @default(0)
+  total_accidentes           Int      @default(0)
+  ultima_sancion             DateTime? @db.Date
+  
+  // ========================================
+  // INFORMACIÓN ADICIONAL
+  // ========================================
+  foto_url                   String?  @db.VarChar(255)
+  observaciones              String?  @db.Text
+  estadoCivil                String?  @db.VarChar(20)
+  numeroHijos                Int?
+  
+  // Contacto de emergencia
+  contacto_emergencia_nombre   String? @db.VarChar(100)
+  contacto_emergencia_telefono String? @db.VarChar(15)
+  nombreContacto               String? @db.VarChar(100)
+  celularContacto              String? @db.VarChar(15)
+  
+  // Salud
+  tipo_sangre                String?  @db.VarChar(5)
+  alergias                   String?  @db.Text
+  condiciones_medicas        String?  @db.Text
+  
+  // ========================================
+  // AUDITORÍA
+  // ========================================
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  creadoPor                  String?  @db.VarChar(100)
+  modificadoPor              String?  @db.VarChar(100)
+  
+  // ========================================
+  // RELACIONES PARA TRACKING
+  // ========================================
+  ubicacionesHistorial       UbicacionConductor[]
+  serviciosAsignados         Servicio[]
+  
+  @@map("conductores")
+}
+
+// ========================================
+// HISTORIAL DE UBICACIONES GPS
+// ========================================
+model UbicacionConductor {
+  id          Int      @id @default(autoincrement())
+  conductorId Int
+  conductor   Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+  
+  // Coordenadas GPS precisas
+  latitud     Float
+  longitud    Float
+  precision   Float?   // metros de precisión GPS
+  altitud     Float?   // metros sobre nivel del mar
+  velocidad   Float?   // km/h
+  rumbo       Float?   // grados 0-360
+  
+  // Metadata del tracking
+  timestamp   DateTime @default(now())
+  fuente      String?  // GPS, NETWORK, PASSIVE
+  bateria     Int?     // % batería en ese momento
+  
+  // Contexto del viaje
+  enServicio  Boolean  @default(false)
+  servicioId  Int?
+  distanciaRecorrida Float? // km desde último punto
+  
+  @@map("ubicaciones_conductor")
+  @@index([conductorId, timestamp])
+  @@index([timestamp])
+  @@index([conductorId, enServicio])
+}
+
+// ========================================
+// SERVICIOS DE TRANSPORTE
+// ========================================
+model Servicio {
+  id                    Int      @id @default(autoincrement())
+  codigo                String   @unique @default(cuid())
+  
+  // Información del paciente
+  pacienteNombre        String
+  pacienteDni           String?
+  pacienteTelefono      String?
+  pacienteObservaciones String?
+  
+  // Ubicaciones con coordenadas EXACTAS
+  origenDireccion       String
+  origenLatitud         Float
+  origenLongitud        Float
+  origenReferencia      String?
+  
+  destinoDireccion      String
+  destinoLatitud        Float
+  destinoLongitud       Float
+  destinoReferencia     String?
+  
+  // Timing del servicio
+  fechaHora             DateTime
+  fechaHoraLlegada      DateTime? // Estimada
+  fechaHoraRecojo       DateTime? // Real
+  fechaHoraEntrega      DateTime? // Real
+  
+  tiempoEstimado        Int?      // minutos
+  distanciaEstimada     Float?    // km
+  distanciaReal         Float?    // km recorridos
+  
+  // Estados del servicio
+  estado                EstadoServicio @default(PENDIENTE)
+  tipoServicio          TipoServicio
+  prioridad             Prioridad @default(NORMAL)
+  
+  // Asignación de conductor
+  conductorId           Int?
+  conductor             Conductor? @relation(fields: [conductorId], references: [id])
+  fechaAsignacion       DateTime?
+  fechaAceptacion       DateTime?
+  fechaInicio           DateTime?
+  fechaFinalizacion     DateTime?
+  
+  // Clínica destino
+  clinicaId             Int
+  clinica               Clinica @relation(fields: [clinicaId], references: [id])
+  
+  // TRACKING DE RUTA - FUNDAMENTAL
+  rutaOptimizada        Json?     // Waypoints calculados
+  rutaReal              Json?     // Ruta GPS real seguida
+  puntoControl          Json?     // Checkpoints importantes
+  
+  // Gestión de incidentes
+  observaciones         String?
+  incidentes            Json?     // Array de incidentes en ruta
+  motivoCancelacion     String?
+  calificacion          Float?    // 1-5 estrellas
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("servicios")
+  @@index([estado, fechaHora])
+  @@index([conductorId])
+  @@index([clinicaId])
+  @@index([fechaHora])
+}
+
+// ========================================
+// CLÍNICAS (CON GPS)
+// ========================================
+model Clinica {
+  id            Int      @id @default(autoincrement())
+  nombre        String
+  direccion     String?
+  
+  // COORDENADAS EXACTAS para tracking
+  latitud       Float
+  longitud      Float
+  radio         Float?   // metros de radio de llegada
+  
+  telefono      String?
+  email         String?
+  contacto      String?
+  
+  // Operatividad
+  horarioAtencion Json?  // {"lunes": "08:00-18:00"}
+  especialidades  String[]
+  codigoSIS       String?
+  
+  estado        EstadoClinica @default(ACTIVA)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  servicios     Servicio[]
+  
+  @@map("clinicas")
+}
+
+// ========================================
+// DISTRITOS (TABLA COMPARTIDA)
+// ========================================
+model Distrito {
+  id            Int       @id @default(autoincrement())
+  nombre        String    @unique
+  provincia     String    @default("Lima")
+  codigoPostal  String?
+  
+  // Geolocalización
+  latitud       Float?
+  longitud      Float?
+  codigoUbigeo  String?   @unique
+  zona          String?   // Norte, Sur, Este, Centro, Callao
+  
+  // Metadata
+  poblacion     Int?
+  areaKm2       Float?
+  activo        Boolean   @default(true)
+  
+  // Auditoría
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relaciones
+  conductores   Conductor[]
+  
+  @@index([nombre])
+  @@index([provincia])
+  @@index([codigoUbigeo])
+  @@map("distritos")
+}
+
+// ========================================
+// ENUMS PARA TRACKING GPS
+// ========================================
+enum EstadoConductor {
+  ACTIVO
+  INACTIVO
+  EN_PERMISO
+  RETIRADO
+  SUSPENDIDO
+  VACACIONES
+  LICENCIA_MEDICA
+}
+
+enum EstadoTracking {
+  DESCONECTADO    // Sin GPS
+  DISPONIBLE      // Conectado, sin servicio
+  EN_CAMINO       // Dirigiéndose al origen
+  EN_ORIGEN       // Llegó a recoger paciente
+  EN_TRANSPORTE   // Transportando paciente
+  EN_DESTINO      // En la clínica
+  RETORNANDO      // Regresando después del servicio
+  NO_DISPONIBLE   // Ocupado/descanso
+  EMERGENCIA      // Situación de emergencia
+}
+
+enum EstadoServicio {
+  PENDIENTE       // Creado, sin asignar
+  ASIGNADO        // Asignado a conductor
+  ACEPTADO        // Conductor aceptó
+  EN_CAMINO       // Conductor en ruta al origen
+  EN_ORIGEN       // Llegó por paciente
+  EN_TRANSPORTE   // Paciente a bordo
+  EN_DESTINO      // Llegó a clínica
+  COMPLETADO      // Servicio terminado
+  CANCELADO       // Cancelado
+  INCIDENTE       // Problema durante servicio
+}
+
+enum TipoServicio {
+  CONSULTA_MEDICA
+  EMERGENCIA
+  LABORATORIO
+  RADIOLOGIA
+  CIRUGIA
+  TERAPIA
+  DIALISIS
+  QUIMIOTERAPIA
+  OTROS
+}
+
+enum Prioridad {
+  BAJA
+  NORMAL
+  ALTA
+  URGENTE
+  EMERGENCIA
+}
+
+enum EstadoClinica {
+  ACTIVA
+  INACTIVA
+  MANTENIMIENTO
+}

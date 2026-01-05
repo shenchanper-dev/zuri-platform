@@ -1,0 +1,443 @@
+"use client";
+import { useState, useEffect } from 'react';
+import ClinicaModal from '@/components/modals/ClinicaModal';
+
+interface Clinica {
+  id: number;
+  nombre: string;
+  tipo: string;
+  direccion: string;
+  distrito: string;
+  latitud: number;
+  longitud: number;
+  telefono: string;
+  email: string;
+  contacto: string;
+  estado: string;
+  servicios24h: boolean;
+  emergencia: boolean;
+  uci: boolean;
+  segurosAceptados: string;
+  numeroConsultorios: number;
+  numeroCamas: number;
+}
+
+interface Estadisticas {
+  total: number;
+  activas: number;
+  conEmergencia: number;
+  atienden24h: number;
+  conUci: number;
+  porTipo: {
+    clinicas: number;
+    hospitales: number;
+    centros: number;
+  };
+}
+
+interface Distrito {
+  id: number;
+  nombre: string;
+  provincia: string;
+  latitud: number;
+  longitud: number;
+}
+
+export default function ClinicasPage() {
+  const [clinicas, setClinicas] = useState<Clinica[]>([]);
+  const [distritos, setDistritos] = useState<Distrito[]>([]);
+  const [estadisticas, setEstadisticas] = useState<Estadisticas>({
+    total: 0,
+    activas: 0,
+    conEmergencia: 0,
+    atienden24h: 0,
+    conUci: 0,
+    porTipo: { clinicas: 0, hospitales: 0, centros: 0 }
+  });
+  
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [tipoFilter, setTipoFilter] = useState('Todos');
+  const [distritoFilter, setDistritoFilter] = useState('Todos');
+  const [selectedClinica, setSelectedClinica] = useState<Clinica | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    fetchClinicas();
+    fetchDistritos();
+  }, []);
+
+  const fetchClinicas = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/clinicas');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setClinicas(data.clinicas);
+        setEstadisticas(data.estadisticas);
+      } else {
+        console.error('Error:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching clinicas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDistritos = async () => {
+    console.log('🔍 [Frontend] Cargando distritos...');
+    try {
+      const response = await fetch('/api/distritos');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && Array.isArray(result.data)) {
+        console.log(`✅ [Frontend] ${result.data.length} distritos (${result.metadata.lima} Lima, ${result.metadata.callao} Callao)`);
+        setDistritos(result.data);
+      } else {
+        console.error('❌ [Frontend] Formato inválido:', result);
+        setDistritos([]);
+      }
+    } catch (error) {
+      console.error('❌ [Frontend] Error:', error);
+      setDistritos([]);
+    }
+  };
+
+  const handleSaveClinica = async (formData: any) => {
+    try {
+      const url = selectedClinica ? `/api/clinicas/${selectedClinica.id}` : '/api/clinicas';
+      const method = selectedClinica ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        await fetchClinicas();
+        setIsModalOpen(false);
+        setSelectedClinica(null);
+        alert(selectedClinica ? 'Clínica actualizada exitosamente' : 'Clínica creada exitosamente');
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error}`);
+      }
+    } catch (error) {
+      alert('Error de conexión');
+    }
+  };
+
+  const handleDeleteClinica = async (id: number) => {
+    if (confirm('¿Está seguro de eliminar esta clínica?')) {
+      try {
+        const response = await fetch(`/api/clinicas/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+          await fetchClinicas();
+          alert('Clínica eliminada exitosamente');
+        } else {
+          alert('Error al eliminar la clínica');
+        }
+      } catch (error) {
+        alert('Error de conexión');
+      }
+    }
+  };
+
+  // Filtrar clínicas
+  const clinicasFiltradas = clinicas.filter(clinica => {
+    const matchesSearch = 
+      clinica.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      clinica.direccion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      clinica.distrito?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesTipo = tipoFilter === 'Todos' || clinica.tipo === tipoFilter;
+    const matchesDistrito = distritoFilter === 'Todos' || clinica.distrito === distritoFilter;
+    
+    return matchesSearch && matchesTipo && matchesDistrito;
+  });
+
+  // Obtener distritos únicos de las clínicas
+  const distritosUnicos = [...new Set(clinicas.map(c => c.distrito).filter(Boolean))];
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
+        <div style={{ fontSize: '18px' }}>Cargando clínicas...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '24px', backgroundColor: '#f9fafb', minHeight: '100vh' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
+            Clínicas y Hospitales
+          </h1>
+          <p style={{ color: '#6b7280', marginTop: '4px' }}>
+            Gestiona los establecimientos de salud del sistema
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setSelectedClinica(null);
+            setIsModalOpen(true);
+          }}
+          style={{
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            border: 'none',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          + Nueva Clínica
+        </button>
+      </div>
+
+      {/* Estadísticas */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3b82f6' }}>{estadisticas.total}</div>
+          <div style={{ color: '#6b7280', fontSize: '14px' }}>Total Clínicas</div>
+        </div>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>{estadisticas.activas}</div>
+          <div style={{ color: '#6b7280', fontSize: '14px' }}>Activas</div>
+        </div>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f59e0b' }}>{estadisticas.conEmergencia}</div>
+          <div style={{ color: '#6b7280', fontSize: '14px' }}>Con Emergencia</div>
+        </div>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#8b5cf6' }}>{estadisticas.atienden24h}</div>
+          <div style={{ color: '#6b7280', fontSize: '14px' }}>Atención 24H</div>
+        </div>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>{estadisticas.conUci}</div>
+          <div style={{ color: '#6b7280', fontSize: '14px' }}>Con UCI</div>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '16px' }}>
+          <div>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, dirección o distrito..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+          
+          <div>
+            <select
+              value={distritoFilter}
+              onChange={(e) => setDistritoFilter(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}
+            >
+              <option value="Todos">Todos los distritos</option>
+              {distritos.map(d => (
+                <option key={d.id} value={d.nombre}>{d.nombre}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabla de clínicas */}
+      <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead style={{ backgroundColor: '#f9fafb' }}>
+              <tr>
+                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 'bold', color: '#374151', borderBottom: '1px solid #e5e7eb' }}>
+                  CLÍNICA/HOSPITAL
+                </th>
+                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 'bold', color: '#374151', borderBottom: '1px solid #e5e7eb' }}>
+                  UBICACIÓN
+                </th>
+                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 'bold', color: '#374151', borderBottom: '1px solid #e5e7eb' }}>
+                  CONTACTO
+                </th>
+                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 'bold', color: '#374151', borderBottom: '1px solid #e5e7eb' }}>
+                  SERVICIOS
+                </th>
+                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 'bold', color: '#374151', borderBottom: '1px solid #e5e7eb' }}>
+                  ESTADO
+                </th>
+                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 'bold', color: '#374151', borderBottom: '1px solid #e5e7eb' }}>
+                  ACCIONES
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {clinicasFiltradas.map((clinica) => (
+                <tr key={clinica.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '16px', verticalAlign: 'top' }}>
+                    <div style={{ fontWeight: 'bold', color: '#1f2937' }}>{clinica.nombre}</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{clinica.tipo}</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                      {clinica.numeroConsultorios} consultorios • {clinica.numeroCamas} camas
+                    </div>
+                  </td>
+                  <td style={{ padding: '16px', verticalAlign: 'top' }}>
+                    <div style={{ color: '#374151' }}>{clinica.direccion}</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                      📍 {clinica.distrito}
+                    </div>
+                  </td>
+                  <td style={{ padding: '16px', verticalAlign: 'top' }}>
+                    <div style={{ color: '#374151' }}>{clinica.telefono}</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{clinica.email}</div>
+                    {clinica.contacto && (
+                      <div style={{ fontSize: '12px', color: '#6b7280' }}>👤 {clinica.contacto}</div>
+                    )}
+                  </td>
+                  <td style={{ padding: '16px', verticalAlign: 'top' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {clinica.emergencia && (
+                        <span style={{ 
+                          fontSize: '10px', 
+                          backgroundColor: '#fef3c7', 
+                          color: '#92400e', 
+                          padding: '2px 6px', 
+                          borderRadius: '12px' 
+                        }}>
+                          🚨 Emergencia
+                        </span>
+                      )}
+                      {clinica.servicios24h && (
+                        <span style={{ 
+                          fontSize: '10px', 
+                          backgroundColor: '#dbeafe', 
+                          color: '#1e40af', 
+                          padding: '2px 6px', 
+                          borderRadius: '12px' 
+                        }}>
+                          🕐 24H
+                        </span>
+                      )}
+                      {clinica.uci && (
+                        <span style={{ 
+                          fontSize: '10px', 
+                          backgroundColor: '#fee2e2', 
+                          color: '#991b1b', 
+                          padding: '2px 6px', 
+                          borderRadius: '12px' 
+                        }}>
+                          🏥 UCI
+                        </span>
+                      )}
+                    </div>
+                    {clinica.segurosAceptados && (
+                      <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                        💳 {clinica.segurosAceptados}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ padding: '16px', verticalAlign: 'top' }}>
+                    <span style={{
+                      padding: '4px 8px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      backgroundColor: clinica.estado === 'ACTIVA' ? '#dcfce7' : '#fee2e2',
+                      color: clinica.estado === 'ACTIVA' ? '#166534' : '#991b1b'
+                    }}>
+                      {clinica.estado}
+                    </span>
+                  </td>
+                  <td style={{ padding: '16px', verticalAlign: 'top' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          setSelectedClinica(clinica);
+                          setIsModalOpen(true);
+                        }}
+                        style={{
+                          color: '#3b82f6',
+                          backgroundColor: '#eff6ff',
+                          padding: '6px 12px',
+                          borderRadius: '4px',
+                          border: 'none',
+                          fontSize: '12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ✏️ Editar
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClinica(clinica.id)}
+                        style={{
+                          color: '#ef4444',
+                          backgroundColor: '#fef2f2',
+                          padding: '6px 12px',
+                          borderRadius: '4px',
+                          border: 'none',
+                          fontSize: '12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🗑️ Eliminar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {clinicasFiltradas.length === 0 && (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+            No se encontraron clínicas que coincidan con los filtros
+          </div>
+        )}
+
+        <div style={{ padding: '16px', borderTop: '1px solid #e5e7eb', backgroundColor: '#f9fafb', fontSize: '14px', color: '#6b7280' }}>
+          Mostrando {clinicasFiltradas.length} de {estadisticas.total} clínicas
+        </div>
+      </div>
+
+      {/* Modal */}
+      <ClinicaModal
+        clinica={selectedClinica}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedClinica(null);
+        }}
+        onSave={handleSaveClinica}
+        distritos={distritos}
+      />
+    </div>
+  );
+}

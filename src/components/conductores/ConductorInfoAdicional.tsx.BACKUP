@@ -1,0 +1,556 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+
+import { 
+  User, Clock, Car, Award, X, Camera, Trash2,
+  Phone, Mail, Shield, MapPin, Star,
+  Navigation, DollarSign
+} from 'lucide-react';
+
+interface ConductorInfoAdicionalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  conductorId: number;
+  onUpdate?: () => void;
+}
+
+const ConductorInfoAdicional: React.FC<ConductorInfoAdicionalProps> = ({ 
+  isOpen, 
+  onClose, 
+  conductorId,
+  onUpdate 
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [info, setInfo] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('general');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen && conductorId) {
+      loadConductorInfo();
+    }
+  }, [isOpen, conductorId]);
+
+  const loadConductorInfo = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/conductores/${conductorId}/info-adicional`);
+      if (response.ok) {
+        const data = await response.json();
+        setInfo(data);
+      } else {
+        console.error('Error cargando información');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 5 * 1024 * 1024;
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+
+    if (!allowedTypes.includes(file.type)) {
+      setPhotoError('Solo se permiten archivos JPG, PNG y GIF');
+      return;
+    }
+
+    if (file.size > maxSize) {
+      setPhotoError('El archivo no puede ser mayor a 5MB');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    setPhotoError('');
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('conductorId', conductorId.toString());
+
+    try {
+      const response = await fetch('/api/conductores/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setInfo(prev => ({
+          ...prev,
+          conductor: {
+            ...prev.conductor,
+            fotoPerfil: result.fileUrl,
+            fotoFilename: result.filename
+          }
+        }));
+        
+        if (onUpdate) onUpdate();
+      } else {
+        setPhotoError(result.error || 'Error al subir la foto');
+      }
+    } catch (error) {
+      setPhotoError('Error de conexión');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar la foto de perfil?')) {
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const response = await fetch(`/api/conductores/upload?conductorId=${conductorId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setInfo(prev => ({
+          ...prev,
+          conductor: {
+            ...prev.conductor,
+            fotoPerfil: null,
+            fotoFilename: null
+          }
+        }));
+        
+        if (onUpdate) onUpdate();
+      }
+    } catch (error) {
+      setPhotoError('Error al eliminar la foto');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const getZoneColor = (zona: string) => {
+    const colors = {
+      'Norte': 'bg-blue-100 text-blue-800',
+      'Sur': 'bg-green-100 text-green-800', 
+      'Este': 'bg-purple-100 text-purple-800',
+      'Oeste': 'bg-orange-100 text-orange-800',
+      'Centro': 'bg-yellow-100 text-yellow-800'
+    };
+    return colors[zona] || 'bg-gray-100 text-gray-800';
+  };
+
+  if (!isOpen) return null;
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando información del conductor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!info) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-8">
+          <p className="text-gray-600">No se pudo cargar la información del conductor</p>
+          <Button onClick={onClose} className="mt-4">Cerrar</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg max-w-6xl w-full mx-4 max-h-[95vh] flex flex-col">
+        
+        {/* Header con foto */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 rounded-t-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-6">
+              {/* Avatar/Foto */}
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 border-4 border-white shadow-lg">
+                  {(info.conductor.fotoPerfil || info.conductor.fotoUrl) ? (
+                    <img 
+                      src={info.conductor.fotoPerfil || info.conductor.fotoUrl} 
+                      alt={info.conductor.nombreCompleto}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-300">
+                      <User className="w-12 h-12 text-gray-600" />
+                    </div>
+                  )}
+                </div>
+                
+                <div className="absolute -bottom-2 -right-2 flex space-x-1">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="w-8 h-8 rounded-full p-0 shadow-lg"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingPhoto}
+                  >
+                    {uploadingPhoto ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    ) : (
+                      <Camera className="w-4 h-4" />
+                    )}
+                  </Button>
+                  
+                  {(info.conductor.fotoPerfil || info.conductor.fotoUrl) && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="w-8 h-8 rounded-full p-0 shadow-lg"
+                      onClick={handlePhotoDelete}
+                      disabled={uploadingPhoto}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/jpeg,image/jpg,image/png,image/gif"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                />
+              </div>
+
+              <div className="flex-1">
+                <h2 className="text-3xl font-bold mb-2">{info.conductor.nombreCompleto}</h2>
+                <p className="text-blue-100 text-lg mb-2">DNI: {info.conductor.dni}</p>
+                
+                <div className="flex space-x-4 text-sm">
+                  <div className="flex items-center space-x-1">
+                    <Star className="w-4 h-4" />
+                    <span>{info.estadisticasOperacion?.promedioCalificacion || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <MapPin className="w-4 h-4" />
+                    <span>{info.estadisticasOperacion?.totalDistritosAsignados || 0} distritos</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <DollarSign className="w-4 h-4" />
+                    <span>S/. {info.estadisticasOperacion?.promedioTarifaZonas || '0.00'}</span>
+                  </div>
+                </div>
+                
+                {photoError && (
+                  <div className="mt-2 p-2 bg-red-100 border border-red-300 rounded text-red-700 text-sm flex items-center">
+                    <X className="w-4 h-4 mr-2" />
+                    {photoError}
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => setPhotoError('')}
+                      className="ml-auto p-1"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="text-white hover:bg-white/20"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Contenido con pestañas */}
+        <div className="flex-1 overflow-hidden">
+          <div className="p-6">
+            <div className="flex space-x-4 border-b mb-6">
+              {[
+                { id: 'general', label: 'General', icon: User },
+                { id: 'vehiculo', label: 'Vehículo', icon: Car },
+                { id: 'horarios', label: 'Horarios', icon: Clock },
+                { id: 'evaluaciones', label: 'Evaluaciones', icon: Award }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center space-x-2 px-4 py-2 border-b-2 transition-colors ${
+                    activeTab === tab.id 
+                      ? 'border-blue-600 text-blue-600' 
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Contenido de pestañas */}
+            <div className="max-h-96 overflow-y-auto">
+              
+              {activeTab === 'general' && (
+                <div className="space-y-6">
+                  {/* Información personal */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white rounded-xl shadow-sm border p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <User className="w-5 h-5 mr-2 text-blue-600" />
+                        Información Personal
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-3">
+                          <Phone className="w-4 h-4 text-gray-500" />
+                          <span>{info.conductor.celular1}</span>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Mail className="w-4 h-4 text-gray-500" />
+                          <span>{info.conductor.email || 'No registrado'}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Estado:</span>
+                          <Badge variant={info.conductor.estado === 'ACTIVO' ? 'default' : 'destructive'}>
+                            {info.conductor.estado}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Estado Servicio:</span>
+                          <Badge variant={info.conductor.estadoServicio === 'DISPONIBLE' ? 'default' : 'secondary'}>
+                            {info.conductor.estadoServicio}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm border p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <Navigation className="w-5 h-5 mr-2 text-green-600" />
+                        Zona de Operación
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span>Radio operación:</span>
+                          <span className="font-semibold">{info.infoAdicional?.radioOperacionKm || 50} km</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Distritos asignados:</span>
+                          <span className="font-semibold">{info.estadisticasOperacion?.totalDistritosAsignados || 0}</span>
+                        </div>
+                        
+                        {info.estadisticasOperacion?.zonasPrincipales?.length > 0 && (
+                          <div>
+                            <span className="text-gray-700 block mb-2">Zonas principales:</span>
+                            <div className="flex flex-wrap gap-2">
+                              {info.estadisticasOperacion.zonasPrincipales.map((zona, index) => (
+                                <Badge 
+                                  key={index} 
+                                  variant="outline" 
+                                  className={getZoneColor(zona)}
+                                >
+                                  {zona}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Distritos asignados */}
+                  {info.distritos && info.distritos.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-sm border p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <MapPin className="w-5 h-5 mr-2 text-indigo-600" />
+                        Distritos de Trabajo ({info.distritos.length})
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {info.distritos.map((distrito, index) => (
+                          <div key={index} className="bg-gray-50 rounded-lg p-4 border">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium">{distrito.nombre}</h4>
+                              <Badge variant="outline" className={getZoneColor(distrito.zona)}>
+                                {distrito.zona}
+                              </Badge>
+                            </div>
+                            <div className="space-y-2 text-sm text-gray-600">
+                              <div className="flex justify-between">
+                                <span>Tráfico:</span>
+                                <Badge 
+                                  variant={distrito.densidad_trafico === 'ALTO' ? 'destructive' : 
+                                         distrito.densidad_trafico === 'MEDIO' ? 'default' : 'secondary'}
+                                >
+                                  {distrito.densidad_trafico}
+                                </Badge>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Tiempo:</span>
+                                <span>{distrito.tiempo_promedio_viaje} min</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Tarifa:</span>
+                                <span className="font-medium text-green-600">S/. {distrito.tarifa_zona}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'vehiculo' && (
+                <div className="space-y-4">
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <Car className="w-5 h-5 mr-2 text-blue-600" />
+                      Información del Vehículo
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex justify-between">
+                        <span>Placa:</span>
+                        <span className="font-semibold">{info.vehiculo?.placa || 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Marca:</span>
+                        <span>{info.vehiculo?.marca || 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Modelo:</span>
+                        <span>{info.vehiculo?.modelo || 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Propietario:</span>
+                        <Badge>{info.vehiculo?.propietario || 'No definido'}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'horarios' && (
+                <div className="space-y-4">
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <Clock className="w-5 h-5 mr-2 text-blue-600" />
+                      Configuración de Horarios
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="flex justify-between">
+                          <span>Turno preferido:</span>
+                          <Badge>{info.infoAdicional?.turnoPreferido || 'VARIADO'}</Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Horario inicio:</span>
+                          <span className="font-semibold">{info.infoAdicional?.horarioInicio || '06:00'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Horario fin:</span>
+                          <span className="font-semibold">{info.infoAdicional?.horarioFin || '22:00'}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="flex justify-between">
+                          <span>Disponible feriados:</span>
+                          <Badge variant={info.infoAdicional?.disponibleFeriados ? 'default' : 'secondary'}>
+                            {info.infoAdicional?.disponibleFeriados ? 'Sí' : 'No'}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Fines de semana:</span>
+                          <Badge variant={info.infoAdicional?.disponibleFinesSemana ? 'default' : 'secondary'}>
+                            {info.infoAdicional?.disponibleFinesSemana ? 'Sí' : 'No'}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Emergencias:</span>
+                          <Badge variant={info.infoAdicional?.disponibleEmergencias ? 'default' : 'secondary'}>
+                            {info.infoAdicional?.disponibleEmergencias ? 'Sí' : 'No'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'evaluaciones' && (
+                <div className="space-y-4">
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <Award className="w-5 h-5 mr-2 text-yellow-600" />
+                      Evaluaciones de Calidad
+                    </h3>
+                    
+                    {info.ultimaEvaluacion?.calificacion ? (
+                      <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold">Última Evaluación:</span>
+                          <div className="flex items-center space-x-2">
+                            <Star className="w-5 h-5 text-yellow-500" />
+                            <span className="text-xl font-bold">{info.ultimaEvaluacion.calificacion}/5</span>
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-600 mt-2">
+                          <p>Fecha: {info.ultimaEvaluacion.fecha}</p>
+                          <p>Evaluador: {info.ultimaEvaluacion.evaluador}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 italic">No hay evaluaciones registradas</p>
+                    )}
+
+                    {info.evaluaciones && info.evaluaciones.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-3">Historial de Evaluaciones:</h4>
+                        <div className="space-y-3">
+                          {info.evaluaciones.slice(0, 3).map((evaluacion, index) => (
+                            <div key={index} className="border rounded-lg p-3">
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium">{evaluacion.fecha_evaluacion}</span>
+                                <div className="flex items-center space-x-1">
+                                  <Star className="w-4 h-4 text-yellow-500" />
+                                  <span>{evaluacion.calificacion_general}</span>
+                                </div>
+                              </div>
+                              <p className="text-sm text-gray-600">Por: {evaluacion.evaluador}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ConductorInfoAdicional;

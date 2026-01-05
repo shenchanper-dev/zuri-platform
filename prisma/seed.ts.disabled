@@ -1,0 +1,42 @@
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  await prisma.conductor.createMany({
+    data: [
+      {
+        dni: "07362537",
+        nombreCompleto: "ALVAREZ LANDA ELI ISAIAS",
+        fechaNacimiento: new Date("1985-03-15"),
+        celular1: "943210900",
+        domicilio: "Av. Lima 123, San Isidro",
+        email: "eli.alvarez@zuri.pe",
+        numeroBrevete: "L12345678",
+        marcaAuto: "Toyota",
+        modelo: "Prius",
+        placa: "FSX-612",
+        estado: "ACTIVO"
+      },
+      {
+        dni: "44516227",
+        nombreCompleto: "ALVAREZ MONTES JHONNY",
+        fechaNacimiento: new Date("1990-08-22"),
+        celular1: "987654321",
+        domicilio: "Jr. Junín 456, Lince",
+        email: "jhonny.alvarez@zuri.pe",
+        numeroBrevete: "A98765432",
+        marcaAuto: "Hyundai",
+        modelo: "Elantra",
+        placa: "DOK-612",
+        estado: "ACTIVO"
+      }
+    ]
+  });
+
+  console.log('Conductores iniciales creados');
+}
+
+main()
+  .catch((e) => console.error(e))
+  .finally(async () => await prisma.$disconnect());

@@ -1,0 +1,381 @@
+// src/app/api/conductores/route.ts
+// API CONDUCTORES - CORREGIDO PARA POSTGRESQL REAL
+// Sistema ZURI NEMT - Compatible con tabla real de 35+ campos
+// ✅ NOMBRES DE COLUMNAS CORREGIDOS (PostgreSQL con camelCase)
+
+import { NextRequest, NextResponse } from 'next/server';
+import { Client } from 'pg';
+
+// INTERFACE EXACTA SEGÚN TABLA REAL
+export interface ConductorReal {
+  id?: number;
+  dni: string;
+  nombres: string;
+  apellidos: string;
+  fechaNacimiento?: string;
+  celular1: string;
+  celular2?: string;
+  email?: string;
+  estadoCivil?: string;
+  numeroHijos?: number;
+  domicilioCompleto?: string;
+  domicilioDistrito?: string;
+  domicilioLatitud?: number;
+  domicilioLongitud?: number;
+  nombreContactoEmergencia?: string;
+  celularContactoEmergencia?: string;
+  numeroBrevete: string;
+  fechaVencimientoBrevete?: string;
+  marcaVehiculo?: string;
+  modeloVehiculo?: string;
+  placa?: string;
+  añoVehiculo?: number;
+  capacidadPasajeros?: number;
+  tipoVehiculo?: string;
+  estado?: string;
+  observaciones?: string;
+  fechaIngreso?: string;
+  ubicacionActualLatitud?: number;
+  ubicacionActualLongitud?: number;
+  ultimaActualizacionGPS?: string;
+  precisionGPS?: number;
+  velocidadActual?: number;
+  rumboActual?: number;
+  nivelBateria?: number;
+  estaConectado?: boolean;
+  ultimaConexion?: string;
+  modoTracking?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+const dbConfig = {
+  connectionString: 'postgresql://postgres@localhost:5432/zuri_db'
+};
+
+// GET: Obtener conductores
+export async function GET() {
+  let client: Client | null = null;
+  
+  try {
+    console.log('🔍 [API-Conductores] Iniciando consulta...');
+    
+    client = new Client(dbConfig);
+    await client.connect();
+
+    // ✅ Query CORREGIDA - La tabla PostgreSQL preserva camelCase con comillas
+    const query = `
+      SELECT 
+        id,
+        dni,
+        nombres,
+        apellidos,
+        "fechaNacimiento",
+        foto,
+        celular1,
+        celular2,
+        email,
+        "estadoCivil",
+        "numeroHijos",
+        "domicilioCompleto",
+        "domicilioDistrito",
+        "domicilioLatitud",
+        "domicilioLongitud",
+        "nombreContactoEmergencia",
+        "celularContactoEmergencia",
+        "numeroBrevete",
+        "fechaVencimientoBrevete",
+        "marcaVehiculo",
+        "modeloVehiculo",
+        placa,
+        "añoVehiculo",
+        "capacidadPasajeros",
+        "tipoVehiculo",
+        estado,
+        observaciones,
+        "fechaIngreso",
+        "ubicacionActualLatitud",
+        "ubicacionActualLongitud",
+        "ultimaActualizacionGPS",
+        "precisionGPS",
+        "velocidadActual",
+        "rumboActual",
+        "nivelBateria",
+        "estaConectado",
+        "ultimaConexion",
+        "modoTracking"
+        
+        
+      FROM conductores 
+      ORDER BY id DESC
+    `;
+
+    const result = await client.query(query);
+    console.log(`✅ [API-Conductores] Encontrados: ${result.rows.length} conductores`);
+
+    // ✅ Mapeo corregido - nombres con camelCase como los devuelve PostgreSQL con comillas
+    const conductores = result.rows.map(row => ({
+      id: row.id,
+      dni: row.dni,
+      nombres: row.nombres,
+      apellidos: row.apellidos,
+      foto: row.foto || null,  // ✅ NUEVO CAMPO
+      fechaNacimiento: row.fechaNacimiento ? new Date(row.fechaNacimiento).toISOString().split('T')[0] : null,
+      celular1: row.celular1,
+      celular2: row.celular2,
+      email: row.email,
+      estadoCivil: row.estadoCivil,
+      numeroHijos: row.numeroHijos || 0,
+      domicilioCompleto: row.domicilioCompleto,
+      domicilioDistrito: row.domicilioDistrito,
+      domicilioLatitud: row.domicilioLatitud ? parseFloat(row.domicilioLatitud) : null,
+      domicilioLongitud: row.domicilioLongitud ? parseFloat(row.domicilioLongitud) : null,
+      nombreContactoEmergencia: row.nombreContactoEmergencia,
+      celularContactoEmergencia: row.celularContactoEmergencia,
+      numeroBrevete: row.numeroBrevete,
+      fechaVencimientoBrevete: row.fechaVencimientoBrevete ? new Date(row.fechaVencimientoBrevete).toISOString().split('T')[0] : null,
+      marcaVehiculo: row.marcaVehiculo,
+      modeloVehiculo: row.modeloVehiculo,
+      placa: row.placa,
+      añoVehiculo: row.añoVehiculo,
+      capacidadPasajeros: row.capacidadPasajeros || 4,
+      tipoVehiculo: row.tipoVehiculo || 'SEDAN',
+      estado: row.estado || 'ACTIVO',
+      observaciones: row.observaciones,
+      fechaIngreso: row.fechaIngreso ? new Date(row.fechaIngreso).toISOString().split('T')[0] : null,
+      ubicacionActualLatitud: row.ubicacionActualLatitud ? parseFloat(row.ubicacionActualLatitud) : null,
+      ubicacionActualLongitud: row.ubicacionActualLongitud ? parseFloat(row.ubicacionActualLongitud) : null,
+      ultimaActualizacionGPS: row.ultimaActualizacionGPS ? new Date(row.ultimaActualizacionGPS).toISOString() : null,
+      precisionGPS: row.precisionGPS ? parseFloat(row.precisionGPS) : null,
+      velocidadActual: row.velocidadActual ? parseFloat(row.velocidadActual) : 0,
+      rumboActual: row.rumboActual || 0,
+      nivelBateria: row.nivelBateria || 100,
+      estaConectado: row.estaConectado || false,
+      ultimaConexion: row.ultimaConexion ? new Date(row.ultimaConexion).toISOString() : null,
+      modoTracking: row.modoTracking || 'MANUAL',
+      createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : null,
+      updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : null
+    }));
+
+    // Estadísticas reales
+    const stats = {
+      total: conductores.length,
+      activos: conductores.filter(c => c.estado === 'ACTIVO').length,
+      conectados: conductores.filter(c => c.estaConectado).length,
+      conVehiculo: conductores.filter(c => c.marcaVehiculo).length,
+      conGPS: conductores.filter(c => c.ubicacionActualLatitud && c.ubicacionActualLongitud).length
+    };
+
+    return NextResponse.json({ 
+      conductores, 
+      stats,
+      success: true 
+    });
+
+  } catch (error) {
+    console.error('❌ [API-Conductores] Error en GET:', error);
+    return NextResponse.json(
+      { 
+        error: error.message, 
+        success: false,
+        codigo_error: 'CONDUCTOR_GET_ERROR'
+      }, 
+      { status: 500 }
+    );
+  } finally {
+    if (client) {
+      await client.end();
+    }
+  }
+}
+
+// POST: Crear conductor
+export async function POST(request: NextRequest) {
+  let client: Client | null = null;
+  
+  try {
+    const body = await request.json();
+    console.log('💾 [API-Conductores] Creando conductor DNI:', body.dni);
+
+    // Validaciones específicas NEMT
+    if (!body.dni || body.dni.length !== 8 || !/^\d{8}$/.test(body.dni)) {
+      return NextResponse.json(
+        { error: 'DNI debe tener exactamente 8 dígitos numéricos', success: false },
+        { status: 400 }
+      );
+    }
+
+    if (!body.nombres?.trim()) {
+      return NextResponse.json(
+        { error: 'Nombres son obligatorios', success: false },
+        { status: 400 }
+      );
+    }
+
+    if (!body.apellidos?.trim()) {
+      return NextResponse.json(
+        { error: 'Apellidos son obligatorios', success: false },
+        { status: 400 }
+      );
+    }
+
+    if (!body.celular1 || !/^9\d{8}$/.test(body.celular1)) {
+      return NextResponse.json(
+        { error: 'Celular debe tener 9 dígitos y empezar con 9', success: false },
+        { status: 400 }
+      );
+    }
+
+    if (!body.numeroBrevete?.trim()) {
+      return NextResponse.json(
+        { error: 'Número de brevete es obligatorio', success: false },
+        { status: 400 }
+      );
+    }
+
+    client = new Client(dbConfig);
+    await client.connect();
+
+    // Verificar DNI único
+    const existingCheck = await client.query(
+      'SELECT id FROM conductores WHERE dni = $1',
+      [body.dni]
+    );
+
+    if (existingCheck.rows.length > 0) {
+      return NextResponse.json(
+        { error: 'Ya existe un conductor con este DNI', success: false },
+        { status: 400 }
+      );
+    }
+
+    // ✅ INSERT con nombres de columnas PostgreSQL correctos (camelCase original en la definición)
+    const insertQuery = `
+      INSERT INTO conductores (
+        dni,
+        nombres,
+        apellidos,
+        "fechaNacimiento",
+        foto,
+        celular1,
+        celular2,
+        email,
+        "estadoCivil",
+        "numeroHijos",
+        "domicilioCompleto",
+        "domicilioDistrito",
+        "domicilioLatitud",
+        "domicilioLongitud",
+        "nombreContactoEmergencia",
+        "celularContactoEmergencia",
+        "numeroBrevete",
+        "fechaVencimientoBrevete",
+        "marcaVehiculo",
+        "modeloVehiculo",
+        placa,
+        "añoVehiculo",
+        "capacidadPasajeros",
+        "tipoVehiculo",
+        estado,
+        observaciones,
+        "fechaIngreso",
+        "ubicacionActualLatitud",
+        "ubicacionActualLongitud",
+        "ultimaActualizacionGPS",
+        "precisionGPS",
+        "velocidadActual",
+        "rumboActual",
+        "nivelBateria",
+        "estaConectado",
+        "ultimaConexion",
+        "modoTracking"
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+        $31, $32, $33, $34, $35, $36, $37
+      ) RETURNING id, dni, nombres, apellidos
+    `;
+
+    const insertValues = [
+      body.dni,
+      body.nombres,
+      body.apellidos,
+      body.fechaNacimiento || null,
+      body.foto || null,  // ← AGREGAR ESTA LÍNEA
+      body.celular1,
+      body.celular2 || null,
+      body.email || null,
+      body.estadoCivil || null,
+      body.numeroHijos || 0,
+      body.domicilioCompleto || null,
+      body.domicilioDistrito || null,
+      body.domicilioLatitud || null,
+      body.domicilioLongitud || null,
+      body.nombreContactoEmergencia || null,
+      body.celularContactoEmergencia || null,
+      body.numeroBrevete,
+      body.fechaVencimientoBrevete || null,
+      body.marcaVehiculo || null,
+      body.modeloVehiculo || null,
+      body.placa || null,
+      body.añoVehiculo || null,
+      body.capacidadPasajeros || 4,
+      body.tipoVehiculo || 'SEDAN',
+      body.estado || 'ACTIVO',
+      body.observaciones || null,
+      body.fechaIngreso || new Date().toISOString().split('T')[0],
+      body.ubicacionActualLatitud || null,
+      body.ubicacionActualLongitud || null,
+      body.ultimaActualizacionGPS || null,
+      body.precisionGPS || null,
+      body.velocidadActual || 0,
+      body.rumboActual || 0,
+      body.nivelBateria || 100,
+      body.estaConectado || false,
+      body.ultimaConexion || null,
+      body.modoTracking || 'MANUAL',
+    ];
+
+    const result = await client.query(insertQuery, insertValues);
+    const nuevoConductor = result.rows[0];
+
+    console.log(`✅ [API-Conductores] Conductor creado exitosamente - ID: ${nuevoConductor.id}, DNI: ${nuevoConductor.dni}`);
+
+    return NextResponse.json({
+      success: true,
+      conductor: {
+        id: nuevoConductor.id,
+        dni: nuevoConductor.dni,
+        nombres: nuevoConductor.nombres,
+        apellidos: nuevoConductor.apellidos,
+        nombreCompleto: `${nuevoConductor.nombres} ${nuevoConductor.apellidos}`.trim()
+      },
+      message: 'Conductor creado exitosamente'
+    }, { status: 201 });
+
+  } catch (error) {
+    console.error('❌ [API-Conductores] Error al crear:', error);
+    
+    // Manejo específico de errores PostgreSQL
+    if (error.code === '23505') { // Unique violation
+      return NextResponse.json(
+        { error: 'DNI ya existe en el sistema', success: false },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { 
+        error: error.message, 
+        success: false,
+        codigo_error: 'CONDUCTOR_CREATE_ERROR'
+      },
+      { status: 500 }
+    );
+  } finally {
+    if (client) {
+      await client.end();
+    }
+  }
+}

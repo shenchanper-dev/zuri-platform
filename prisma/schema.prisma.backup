@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Conductor {
+  id                Int      @id @default(autoincrement())
+  dni               String   @unique
+  nombreCompleto    String
+  fechaNacimiento   DateTime
+  celular1          String
+  celular2          String?
+
+  direccion         String?
+  distritoId        Int?
+  distrito          Distrito? @relation(fields: [distritoId], references: [id])
+  email             String
+  numeroBrevete     String
+  
+  // Información del vehículo
+  marcaAuto         String
+  modelo            String
+  placa             String?
+  propietario       String?
+  
+  // Estados para tracking
+  estado            EstadoConductor @default(ACTIVO)
+  estadoServicio    EstadoTracking  @default(DESCONECTADO)
+  
+  // Geolocalización TIEMPO REAL
+  latitud           Float?
+  longitud          Float?
+  ultimaUbicacion   DateTime?
+  precision         Float?
+  velocidad         Float?  // km/h
+  rumbo             Float?  // 0-360 grados
+  bateria           Int?    // % batería móvil
+  
+  // Información adicional
+  estadoCivil       String?
+  numeroHijos       Int?
+  nombreContacto    String?
+  celularContacto   String?
+  observaciones     String?
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relaciones para TRACKING
+  ubicacionesHistorial UbicacionConductor[]
+  serviciosAsignados   Servicio[]
+  
+  @@map("conductores")
+}
+
+model UbicacionConductor {
+  id          Int      @id @default(autoincrement())
+  conductorId Int
+  conductor   Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+  
+  // Coordenadas GPS precisas
+  latitud     Float
+  longitud    Float
+  precision   Float?   // metros de precisión GPS
+  altitud     Float?   // metros sobre nivel del mar
+  velocidad   Float?   // km/h
+  rumbo       Float?   // grados 0-360
+  
+  // Metadata del tracking
+  timestamp   DateTime @default(now())
+  fuente      String?  // GPS, NETWORK, PASSIVE
+  bateria     Int?     // % batería en ese momento
+  
+  // Contexto del viaje
+  enServicio  Boolean  @default(false)
+  servicioId  Int?
+  distanciaRecorrida Float? // km desde último punto
+  
+  @@map("ubicaciones_conductor")
+  @@index([conductorId, timestamp])
+  @@index([timestamp])
+  @@index([conductorId, enServicio])
+}
+
+model Servicio {
+  id                    Int      @id @default(autoincrement())
+  codigo                String   @unique @default(cuid())
+  
+  // Información del paciente
+  pacienteNombre        String
+  pacienteDni           String?
+  pacienteTelefono      String?
+  pacienteObservaciones String?
+  
+  // Ubicaciones con coordenadas EXACTAS
+  origenDireccion       String
+  origenLatitud         Float
+  origenLongitud        Float
+  origenReferencia      String?
+  
+  destinoDireccion      String
+  destinoLatitud        Float
+  destinoLongitud       Float
+  destinoReferencia     String?
+  
+  // Timing del servicio
+  fechaHora             DateTime
+  fechaHoraLlegada      DateTime? // Estimada
+  fechaHoraRecojo       DateTime? // Real
+  fechaHoraEntrega      DateTime? // Real
+  
+  tiempoEstimado        Int?      // minutos
+  distanciaEstimada     Float?    // km
+  distanciaReal         Float?    // km recorridos
+  
+  // Estados del servicio
+  estado                EstadoServicio @default(PENDIENTE)
+  tipoServicio          TipoServicio
+  prioridad             Prioridad @default(NORMAL)
+  
+  // Asignación de conductor
+  conductorId           Int?
+  conductor             Conductor? @relation(fields: [conductorId], references: [id])
+  fechaAsignacion       DateTime?
+  fechaAceptacion       DateTime?
+  fechaInicio           DateTime?
+  fechaFinalizacion     DateTime?
+  
+  // Clínica destino
+  clinicaId             Int
+  clinica               Clinica @relation(fields: [clinicaId], references: [id])
+  
+  // TRACKING DE RUTA - FUNDAMENTAL
+  rutaOptimizada        Json?     // Waypoints calculados
+  rutaReal              Json?     // Ruta GPS real seguida
+  puntoControl          Json?     // Checkpoints importantes
+  
+  // Gestión de incidentes
+  observaciones         String?
+  incidentes            Json?     // Array de incidentes en ruta
+  motivoCancelacion     String?
+  calificacion          Float?    // 1-5 estrellas
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("servicios")
+  @@index([estado, fechaHora])
+  @@index([conductorId])
+  @@index([clinicaId])
+  @@index([fechaHora])
+}
+
+model Clinica {
+  id            Int      @id @default(autoincrement())
+  nombre        String
+  direccion     String?
+  
+  // COORDENADAS EXACTAS para tracking
+  latitud       Float
+  longitud      Float
+  radio         Float?   // metros de radio de llegada
+  
+  telefono      String?
+  email         String?
+  contacto      String?
+  
+  // Operatividad
+  horarioAtencion Json?  // {"lunes": "08:00-18:00"}
+  especialidades  String[]
+  codigoSIS       String?
+  
+  estado        EstadoClinica @default(ACTIVA)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  servicios     Servicio[]
+  
+  @@map("clinicas")
+}
+
+// ENUMS PARA TRACKING GPS
+enum EstadoConductor {
+  ACTIVO
+  INACTIVO
+  EN_PERMISO
+  RETIRADO
+}
+
+enum EstadoTracking {
+  DESCONECTADO    // Sin GPS
+  DISPONIBLE      // Conectado, sin servicio
+  EN_CAMINO       // Dirigiéndose al origen
+  EN_ORIGEN       // Llegó a recoger paciente
+  EN_TRANSPORTE   // Transportando paciente
+  EN_DESTINO      // En la clínica
+  RETORNANDO      // Regresando después del servicio
+  NO_DISPONIBLE   // Ocupado/descanso
+  EMERGENCIA      // Situación de emergencia
+}
+
+enum EstadoServicio {
+  PENDIENTE       // Creado, sin asignar
+  ASIGNADO        // Asignado a conductor
+  ACEPTADO        // Conductor aceptó
+  EN_CAMINO       // Conductor en ruta al origen
+  EN_ORIGEN       // Llegó por paciente
+  EN_TRANSPORTE   // Paciente a bordo
+  EN_DESTINO      // Llegó a clínica
+  COMPLETADO      // Servicio terminado
+  CANCELADO       // Cancelado
+  INCIDENTE       // Problema durante servicio
+}
+
+enum TipoServicio {
+  CONSULTA_MEDICA
+  EMERGENCIA
+  LABORATORIO
+  RADIOLOGIA
+  CIRUGIA
+  TERAPIA
+  DIALISIS
+  QUIMIOTERAPIA
+  OTROS
+}
+
+enum Prioridad {
+  BAJA
+  NORMAL
+  ALTA
+  URGENTE
+  EMERGENCIA
+}
+
+enum EstadoClinica {
+  ACTIVA
+  INACTIVA
+  MANTENIMIENTO
+}
+
+model Distrito {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @unique
+  provincia String   @default("Lima")
+  codigoPostal String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relaciones
+  conductores Conductor[]
+  
+  @@map("distritos")
+}

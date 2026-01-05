@@ -1,0 +1,12 @@
+{
+  "trae.integration.enabled": true,
+  "trae.server.port": 8000,
+  "trae.workspace.isolation": true,
+  "trae.ai.role": "assistant",
+  "trae.conflictDetection": true,
+  "trae.memoryLimit": "512MB",
+  "trae.excludePorts": [3000, 3001, 3002, 3003],
+  "trae.autoStart": false,
+  "workbench.editor.enablePreview": false,
+  "terminal.integrated.defaultProfile.linux": "bash"
+}

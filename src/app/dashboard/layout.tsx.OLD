@@ -1,0 +1,257 @@
+"use client";
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+const menuItems = [
+  { icon: '📊', label: 'Dashboard', href: '/dashboard' },
+  { icon: '📋', label: 'Servicios Hoy', href: '/dashboard/servicios' },
+  { icon: '📁', label: 'Gestión Excel', href: '/dashboard/gestion-excel' },
+  { icon: '📅', label: 'Programación', href: '/dashboard/programacion' },
+  { icon: '👥', label: 'Conductores', href: '/dashboard/conductores' },
+  { icon: '🏥', label: 'Clínicas y Hospitales', href: '/dashboard/clinicas' },
+  { icon: '👨‍⚕️', label: 'Doctores y Técnicos', href: '/dashboard/doctores' },
+  { icon: '🏃‍♂️', label: 'Pacientes', href: '/dashboard/pacientes' },
+  { icon: '🗺️', label: 'Rutas', href: '/dashboard/rutas' },
+  { icon: '📈', label: 'Reportes', href: '/dashboard/reportes' },
+  { icon: '⚙️', label: 'Varios', href: '/dashboard/varios' },
+];
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f8fafc' }}>
+      {/* Sidebar */}
+      <div style={{
+        width: '280px',
+        backgroundColor: '#ffffff',
+        borderRight: '1px solid #e2e8f0',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        
+        {/* Logo Header */}
+        <div style={{
+          padding: '20px',
+          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: '#ffffff'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              backgroundColor: '#3b82f6',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '14px'
+            }}>
+              Z
+            </div>
+            <div>
+              <div style={{ 
+                fontSize: '18px', 
+                fontWeight: 'bold', 
+                color: '#1f2937',
+                lineHeight: '1.2'
+              }}>
+                ZURI
+              </div>
+              <div style={{ 
+                fontSize: '12px', 
+                color: '#6b7280',
+                lineHeight: '1.2'
+              }}>
+                Admin
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Menu */}
+        <nav style={{ flex: 1, padding: '16px 0' }}>
+          <ul style={{ margin: 0, padding: '0 12px', listStyle: 'none' }}>
+            {menuItems.map((item, index) => {
+              const isActive = pathname === item.href;
+              return (
+                <li key={index} style={{ marginBottom: '4px' }}>
+                  <Link
+                    href={item.href}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      textDecoration: 'none',
+                      transition: 'all 0.2s',
+                      backgroundColor: isActive ? '#dbeafe' : 'transparent',
+                      color: isActive ? '#1d4ed8' : '#4b5563',
+                      borderLeft: isActive ? '3px solid #1d4ed8' : '3px solid transparent'
+                    }}
+                  >
+                    <span style={{ fontSize: '16px' }}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {/* User Profile */}
+        <div style={{
+          padding: '20px',
+          borderTop: '1px solid #e2e8f0',
+          backgroundColor: '#ffffff'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              backgroundColor: '#3b82f6',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '12px'
+            }}>
+              ZU
+            </div>
+            <div>
+              <div style={{ 
+                fontSize: '14px', 
+                fontWeight: '500', 
+                color: '#1f2937',
+                lineHeight: '1.2'
+              }}>
+                Admin ZURI
+              </div>
+              <div style={{ 
+                fontSize: '12px', 
+                color: '#6b7280',
+                lineHeight: '1.2'
+              }}>
+                Administrador
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Top Header */}
+        <header style={{
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '16px 24px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h1 style={{ 
+              fontSize: '24px', 
+              fontWeight: 'bold', 
+              color: '#1f2937',
+              margin: 0
+            }}>
+              Panel de Administración
+            </h1>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button style={{
+                backgroundColor: '#10b981',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span>📤</span>
+                <span>Exportar</span>
+              </button>
+              
+              <button style={{
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                position: 'relative'
+              }}>
+                <span>🔔</span>
+                <span>Notificaciones</span>
+                <span style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  fontSize: '10px',
+                  borderRadius: '50%',
+                  width: '20px',
+                  height: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  3
+                </span>
+              </button>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  backgroundColor: '#3b82f6',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '12px'
+                }}>
+                  ZU
+                </div>
+                <span style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>
+                  Admin ZURI
+                </span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main style={{ flex: 1, overflow: 'auto' }}>
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}

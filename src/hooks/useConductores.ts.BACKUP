@@ -1,0 +1,309 @@
+// src/hooks/useConductores.ts
+// HOOK CORREGIDO QUE SOLUCIONA EL ERROR DE FORMATO Y MANEJA DISTRITOS CORRECTAMENTE
+
+import { useState, useEffect } from 'react';
+
+// ✅ Interfaces TypeScript exactas para el sistema NEMT
+export interface ConductorData {
+  id?: number;
+  dni: string;
+  nombreCompleto: string;
+  fechaNacimiento?: string;
+  sexo?: string;
+  email?: string;
+  
+  // Dirección y GPS (crítico para tracking)
+  direccionCompleta: string;
+  distrito_id: number;
+  distrito_nombre?: string;
+  latitud?: number;
+  longitud?: number;
+  referenciaUbicacion?: string;
+  
+  // Contacto
+  celular1: string;
+  celular2?: string;
+  telefonoFijo?: string;
+  contactoEmergencia?: string;
+  celularEmergencia?: string;
+  
+  // Licencia
+  numeroBrevete?: string;
+  tipoLicencia?: string;
+  fechaVencimientoBrevete?: string;
+  certificacionMedica?: boolean;
+  fechaCertificacionMedica?: string;
+  
+  // Vehículo
+  marcaVehiculo?: string;
+  modeloVehiculo?: string;
+  anoVehiculo?: number;
+  placaVehiculo?: string;
+  colorVehiculo?: string;
+  tipoVehiculo?: string;
+  capacidadPasajeros?: number;
+  accesoSillasRuedas?: boolean;
+  equipoOxigeno?: boolean;
+  seguroVehicular?: boolean;
+  fechaVencimientoSeguro?: string;
+  
+  // Estado y control
+  estado?: string;
+  observaciones?: string;
+  activo?: boolean;
+  
+  // Métricas para dashboard
+  totalViajes?: number;
+  viajesCompletados?: number;
+  calificacionPromedio?: number;
+  tiempoPromedioViaje?: number;
+  
+  // Timestamps
+  fechaCreacion?: string;
+  fechaActualizacion?: string;
+}
+
+export interface EstadisticasConductores {
+  total: number;
+  activos: number;
+  inactivos: number;
+  disponibles: number;
+  enServicio: number;
+  enMantenimiento: number;
+  conFoto: number;
+  calificacionPromedio: number;
+  totalDistritos: number;
+  totalViajes: number;
+}
+
+interface UseCondductoresReturn {
+  conductores: ConductorData[];
+  estadisticas: EstadisticasConductores;
+  loading: boolean;
+  error: string | null;
+  refrescar: () => Promise<void>;
+  crearConductor: (data: Omit<ConductorData, 'id'>) => Promise<{ success: boolean; error?: string }>;
+  actualizarConductor: (id: number, data: Partial<ConductorData>) => Promise<{ success: boolean; error?: string }>;
+  eliminarConductor: (id: number) => Promise<{ success: boolean; error?: string }>;
+}
+
+export function useConductores(): UseCondductoresReturn {
+  const [conductores, setConductores] = useState<ConductorData[]>([]);
+  const [estadisticas, setEstadisticas] = useState<EstadisticasConductores>({
+    total: 0,
+    activos: 0,
+    inactivos: 0,
+    disponibles: 0,
+    enServicio: 0,
+    enMantenimiento: 0,
+    conFoto: 0,
+    calificacionPromedio: 0,
+    totalDistritos: 50,
+    totalViajes: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Función para cargar conductores desde la API
+  const cargarConductores = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log('🔍 [Hook] Cargando conductores...');
+      
+      const response = await fetch('/api/conductores', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store' // Evitar cache para datos en tiempo real
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ [Hook] Respuesta API conductores:', data);
+
+      // ✅ MANEJO CORRECTO DEL FORMATO DE RESPUESTA
+      if (data && Array.isArray(data.conductores)) {
+        // Formato: { conductores: [...], estadisticas: {...} }
+        setConductores(data.conductores);
+        
+        if (data.estadisticas) {
+          setEstadisticas(data.estadisticas);
+        } else {
+          // Calcular estadísticas si no vienen del backend
+          calcularEstadisticas(data.conductores);
+        }
+      } else if (Array.isArray(data)) {
+        // Formato directo: [...]
+        setConductores(data);
+        calcularEstadisticas(data);
+      } else {
+        console.error('❌ [Hook] Formato de respuesta inesperado:', data);
+        setConductores([]);
+        setError('Formato de datos incorrecto');
+      }
+
+    } catch (err) {
+      console.error('❌ [Hook] Error al cargar conductores:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setConductores([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calcular estadísticas localmente
+  const calcularEstadisticas = (conductoresData: ConductorData[]) => {
+    const stats: EstadisticasConductores = {
+      total: conductoresData.length,
+      activos: conductoresData.filter(c => c.estado === 'activo').length,
+      inactivos: conductoresData.filter(c => c.estado === 'inactivo').length,
+      disponibles: conductoresData.filter(c => c.estado === 'disponible').length,
+      enServicio: conductoresData.filter(c => c.estado === 'en_servicio').length,
+      enMantenimiento: conductoresData.filter(c => c.estado === 'mantenimiento').length,
+      conFoto: conductoresData.filter(c => c.activo).length, // Placeholder
+      calificacionPromedio: conductoresData.length > 0 
+        ? conductoresData.reduce((sum, c) => sum + (Number(c.calificacionPromedio) || 0), 0) / conductoresData.length
+        : 0,
+      totalDistritos: 50, // Lima + Callao
+      totalViajes: conductoresData.reduce((sum, c) => sum + (c.totalViajes || 0), 0)
+    };
+
+    setEstadisticas(stats);
+  };
+
+  // Función para crear conductor
+  const crearConductor = async (conductorData: Omit<ConductorData, 'id'>): Promise<{ success: boolean; error?: string }> => {
+    try {
+      console.log('✅ [Hook] Creando conductor:', conductorData);
+
+      const response = await fetch('/api/conductores', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(conductorData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Error HTTP: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ [Hook] Conductor creado exitosamente:', result);
+
+      // Recargar lista de conductores
+      await cargarConductores();
+
+      return { success: true };
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al crear conductor';
+      console.error('❌ [Hook] Error al crear conductor:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  // Función para actualizar conductor
+  const actualizarConductor = async (id: number, conductorData: Partial<ConductorData>): Promise<{ success: boolean; error?: string }> => {
+    try {
+      console.log(`✅ [Hook] Actualizando conductor ${id}:`, conductorData);
+
+      const response = await fetch(`/api/conductores/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(conductorData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Error HTTP: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ [Hook] Conductor actualizado exitosamente:', result);
+
+      // Recargar lista de conductores
+      await cargarConductores();
+
+      return { success: true };
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al actualizar conductor';
+      console.error('❌ [Hook] Error al actualizar conductor:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  // Función para eliminar conductor
+  const eliminarConductor = async (id: number): Promise<{ success: boolean; error?: string }> => {
+    try {
+      console.log(`✅ [Hook] Eliminando conductor ${id}`);
+
+      const response = await fetch(`/api/conductores/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Error HTTP: ${response.status}`);
+      }
+
+      console.log('✅ [Hook] Conductor eliminado exitosamente');
+
+      // Recargar lista de conductores
+      await cargarConductores();
+
+      return { success: true };
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al eliminar conductor';
+      console.error('❌ [Hook] Error al eliminar conductor:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  // Función para refrescar datos
+  const refrescar = async (): Promise<void> => {
+    await cargarConductores();
+  };
+
+  // Cargar datos al montar el componente
+  useEffect(() => {
+    cargarConductores();
+  }, []);
+
+  // Auto-refresh cada 30 segundos para datos en tiempo real
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!loading) {
+        cargarConductores();
+      }
+    }, 30000); // 30 segundos
+
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  // ✅ RETORNO COMPLETO CON TODAS LAS FUNCIONES
+  return {
+    conductores,
+    estadisticas,
+    loading,
+    error,
+    refrescar,
+    crearConductor,
+    actualizarConductor,
+    eliminarConductor
+  };
+}

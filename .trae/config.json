@@ -1,0 +1,36 @@
+{
+  "workspace": {
+    "isolation": true,
+    "maxProjects": 3,
+    "resourceLimits": {
+      "maxMemory": "512MB",
+      "maxCPU": "25%",
+      "autoShutdown": "30min"
+    }
+  },
+  "server": {
+    "port": 8000,
+    "host": "127.0.0.1",
+    "autoStart": false,
+    "excludePorts": [3000, 3001, 3002, 3003]
+  },
+  "integration": {
+    "vscode": {
+      "enabled": true,
+      "conflictDetection": true,
+      "preserveSettings": true
+    },
+    "excludeProcesses": ["next", "npm", "node", "postgres"]
+  },
+  "ai": {
+    "models": ["claude-3.5-sonnet", "gpt-4o"],
+    "contextSize": "limited",
+    "parallelExecution": false,
+    "readOnlyMode": true
+  },
+  "security": {
+    "workspaceIsolation": true,
+    "fileSystemAccess": "limited",
+    "networkAccess": "limited"
+  }
+}

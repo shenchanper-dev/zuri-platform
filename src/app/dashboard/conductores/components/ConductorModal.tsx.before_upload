@@ -1,0 +1,315 @@
+"use client";
+import UploadFoto from "@/components/UploadFoto";
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // [cite: 878]
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch"; // [cite: 877]
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { conductorService } from '@/services/conductorService';
+import { Conductor } from '@/types/conductor';
+
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  conductorId?: number | null; // Si es null, es modo crear
+  onSuccess: () => void;
+}
+
+export default function ConductorModal({ isOpen, onClose, conductorId, onSuccess }: ModalProps) {
+  const [activeTab, setActiveTab] = useState("perfil");
+  const [isLoading, setIsLoading] = useState(false);
+  const [fullData, setFullData] = useState<any>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  const { register, handleSubmit, reset, setValue, watch } = useForm();
+
+  // Cargar datos completos al abrir
+  useEffect(() => {
+    if (isOpen && conductorId) {
+      setIsLoading(true);
+      conductorService.getById(conductorId)
+        .then((data) => {
+          setFullData(data); // data tiene la estructura { conductor:..., infoAdicional:..., vehiculo:... } [cite: 1378]
+          
+          // Mapear datos planos al formulario
+          reset({
+             ...data.conductor,
+             ...data.infoAdicional, // [cite: 1408]
+             ...data.vehiculo // [cite: 1435]
+          });
+          
+          // Establecer imagen
+          setPreviewImage(data.conductor.fotoPerfil || data.conductor.fotoUrl);
+        })
+        .catch(console.error)
+        .finally(() => setIsLoading(false));
+    } else {
+      reset({});
+      setPreviewImage(null);
+      setFullData(null);
+    }
+  }, [isOpen, conductorId, reset]);
+
+  // Manejo de subida de foto
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && conductorId) {
+      // Crear preview local
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewImage(objectUrl);
+
+      try {
+        // Subir inmediatamente al backend 
+        await conductorService.uploadPhoto(conductorId, file);
+        // Refrescar vista principal si es necesario
+        onSuccess(); 
+      } catch (error) {
+        console.error("Error subiendo imagen", error);
+        alert("Error al subir la imagen");
+      }
+    }
+  };
+
+  const onSubmit = async (data: any) => {
+    try {
+      setIsLoading(true);
+      if (conductorId) {
+        // Lógica de actualización (PUT) dividida por secciones si es necesario
+        await conductorService.updateInfoAdicional(conductorId, {
+           turnoPreferido: data.turnoPreferido,
+           disponibleFinesSemana: data.disponibleFinesSemana,
+           disponibleEmergencias: data.disponibleEmergencias,
+           zonasTrabajo: data.zonasTrabajo, // Array [cite: 1531]
+           // ... otros campos mapeados
+        });
+      } else {
+        // Crear nuevo
+        await conductorService.create(data);
+      }
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {conductorId ? `Gestión de Conductor: ${fullData?.conductor?.nombreCompleto || ''}` : 'Nuevo Conductor'}
+          </DialogTitle>
+        </DialogHeader>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="perfil">Perfil & Foto</TabsTrigger>
+            <TabsTrigger value="nemt">Operación NEMT</TabsTrigger>
+            <TabsTrigger value="certificaciones">Certificaciones</TabsTrigger>
+            <TabsTrigger value="vehiculo">Vehículo</TabsTrigger>
+          </TabsList>
+
+          {/* --- TAB 1: PERFIL Y FOTO --- */}
+          <TabsContent value="perfil" className="space-y-4 py-4">
+            <div className="flex gap-6">
+              {/* Columna Foto */}
+              <div className="flex flex-col items-center space-y-3">
+                <Avatar className="w-32 h-32 border-2 border-primary">
+                  <AvatarImage src={previewImage || ""} />
+                  <AvatarFallback>CN</AvatarFallback>
+                </Avatar>
+                {conductorId && (
+                  <div className="flex flex-col items-center">
+                    <Label htmlFor="picture" className="cursor-pointer bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2 rounded-md text-sm font-medium">
+                      Cambiar Foto
+                    </Label>
+                    <Input 
+                      id="picture" 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleImageChange} 
+                    />
+                    <span className="text-xs text-muted-foreground mt-1">Máx 5MB (JPG/PNG)</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Columna Datos Básicos [cite: 23-32] */}
+              <div className="grid grid-cols-2 gap-4 flex-1">
+                <div className="space-y-2">
+                  <Label>DNI</Label>
+                  <Input {...register("dni")} disabled={!!conductorId} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nombres</Label>
+                  <Input {...register("nombres")} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Apellidos</Label>
+                  <Input {...register("apellidos")} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Celular</Label>
+                  <Input {...register("celular1")} />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Domicilio</Label>
+                  <Input {...register("domicilio")} />
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* --- TAB 2: OPERACIÓN NEMT --- */}
+          <TabsContent value="nemt" className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-6">
+              {/* Disponibilidad [cite: 69-72] */}
+              <div className="space-y-4 border p-4 rounded-lg">
+                <h3 className="font-medium">Horarios y Disponibilidad</h3>
+                <div className="flex items-center justify-between">
+                  <Label>Turno Preferido</Label>
+                  <select {...register("turnoPreferido")} className="border rounded p-1">
+                     <option value="MAÑANA">Mañana</option>
+                     <option value="TARDE">Tarde</option>
+                     <option value="NOCHE">Noche</option>
+                     <option value="VARIADO">Variado</option>
+                  </select>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Fines de Semana</Label>
+                  <Switch 
+                    checked={watch("disponibleFinesSemana")} 
+                    onCheckedChange={(v) => setValue("disponibleFinesSemana", v)} 
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Emergencias (24/7)</Label>
+                  <Switch 
+                    checked={watch("disponibleEmergencias")}
+                    onCheckedChange={(v) => setValue("disponibleEmergencias", v)}
+                  />
+                </div>
+              </div>
+
+              {/* Stats de Calidad (Solo lectura) [cite: 1481-1485] */}
+              <div className="space-y-4 border p-4 rounded-lg bg-slate-50">
+                 <h3 className="font-medium">Métricas de Calidad</h3>
+                 <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Calif. Promedio</p>
+                      <p className="text-xl font-bold text-blue-600">{fullData?.estadisticasOperacion?.promedioCalificacion || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total Viajes</p>
+                      <p className="text-xl font-bold">{fullData?.conductor?.totalViajesCompletados || 0}</p>
+                    </div>
+                 </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* --- TAB 3: CERTIFICACIONES --- */}
+          <TabsContent value="certificaciones" className="space-y-4 py-4">
+            <div className="space-y-4">
+               <p className="text-sm text-muted-foreground">
+                 Gestione las certificaciones requeridas para servicios especializados (Silla de ruedas, Oxígeno, etc.)[cite: 1420].
+               </p>
+               
+               <div className="grid grid-cols-1 gap-4">
+                 {/* Renderizar dinámicamente o estáticamente según diseño */}
+                 <div className="flex items-center justify-between border p-3 rounded">
+                    <div className="flex items-center gap-2">
+                       <Badge variant={fullData?.infoAdicional?.certificaciones?.primerosAuxilios?.activa ? "default" : "outline"}>
+                         Primeros Auxilios
+                       </Badge>
+                    </div>
+                    <Input type="date" className="w-40" {...register("fechaCertPrimerosAuxilios")} />
+                 </div>
+                 
+                 <div className="flex items-center justify-between border p-3 rounded">
+                    <div className="flex items-center gap-2">
+                       <Badge variant={fullData?.infoAdicional?.certificaciones?.cpr?.activa ? "default" : "outline"}>
+                         CPR / BLS
+                       </Badge>
+                    </div>
+                    <Input type="date" className="w-40" {...register("fechaCertCpr")} />
+                 </div>
+               </div>
+               
+               {/* Checkboxes de capacidades [cite: 1430] */}
+               <div className="grid grid-cols-3 gap-4 mt-4">
+                  <div className="flex items-center space-x-2">
+                     <Switch checked={watch("autorizadoSillaRuedas")} onCheckedChange={(v) => setValue("autorizadoSillaRuedas", v)} />
+                     <Label>Silla de Ruedas</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                     <Switch checked={watch("autorizadoCamilla")} onCheckedChange={(v) => setValue("autorizadoCamilla", v)} />
+                     <Label>Camilla</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                     <Switch checked={watch("autorizadoOxigeno")} onCheckedChange={(v) => setValue("autorizadoOxigeno", v)} />
+                     <Label>Oxígeno</Label>
+                  </div>
+               </div>
+            </div>
+          </TabsContent>
+
+          {/* --- TAB 4: VEHÍCULO --- */}
+          <TabsContent value="vehiculo" className="space-y-4 py-4">
+             <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                   <Label>Marca</Label>
+                   <Input {...register("marcaAuto")} placeholder="Toyota, Hyundai..." />
+                </div>
+                <div className="space-y-2">
+                   <Label>Modelo</Label>
+                   <Input {...register("modelo")} />
+                </div>
+                <div className="space-y-2">
+                   <Label>Placa [cite: 36]</Label>
+                   <Input {...register("numeroPlaca")} className="uppercase" />
+                </div>
+                <div className="space-y-2">
+                   <Label>Propietario</Label>
+                   <select {...register("propietario")} className="w-full border rounded h-10 px-3">
+                      <option value="PROPIO">Propio</option>
+                      <option value="FLOTA">Flota/Empresa</option>
+                   </select>
+                </div>
+                
+                <div className="col-span-2 border-t pt-4 mt-2">
+                   <h4 className="font-medium mb-3">Características Especiales [cite: 1457]</h4>
+                   <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                         <Switch checked={watch("adaptadoDiscapacidad")} onCheckedChange={(v) => setValue("adaptadoDiscapacidad", v)} />
+                         <Label>Rampa / Adaptado</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                         <Switch checked={watch("tieneAireAcondicionado")} onCheckedChange={(v) => setValue("tieneAireAcondicionado", v)} />
+                         <Label>Aire Acondicionado</Label>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </TabsContent>
+        </Tabs>
+
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSubmit(onSubmit)} disabled={isLoading}>
+            {isLoading ? 'Guardando...' : (conductorId ? 'Actualizar Conductor' : 'Crear Conductor')}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

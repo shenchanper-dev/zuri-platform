@@ -1,0 +1,39 @@
+// src/services/conductorService.ts
+
+import { Conductor, ConductorFormValues } from '@/domain/entities/Conductor.entity';
+
+// --- NUEVA FUNCIÓN: CREAR CONDUCTOR (Punto 1 - Guardado) ---
+export async function crearConductor(data: ConductorFormValues): Promise<Conductor> {
+    const response = await fetch('/api/conductores', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al crear el conductor');
+    }
+
+    return response.json();
+}
+
+// --- NUEVO TIPO E FUNCIÓN: OBTENER DISTRITOS (Punto 3 - Dirección) ---
+export interface Distrito {
+    id: number;
+    nombre: string;
+    provincia: string;
+}
+
+export async function getDistritos(): Promise<Distrito[]> {
+    const response = await fetch('/api/distritos');
+    if (!response.ok) {
+        throw new Error('Error al obtener la lista de distritos');
+    }
+    return response.json();
+}
+
+// ... (El resto de tus funciones existentes, como getAll, getStats, etc.)
+// Nota: Si tenías un 'conductorService' como objeto, cámbialo a funciones exportadas.
