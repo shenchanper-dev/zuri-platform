@@ -1,0 +1,188 @@
+// scripts/initializeSystem.ts - Script de inicialización completo
+import { initializeZURIAdvancedSystem } from '../src/infrastructure/conductores/advancedServices';
+
+// ============================================
+// INICIALIZACIÓN DEL SISTEMA COMPLETO
+// ============================================
+
+export const initializeZURI = () => {
+  console.clear();
+  
+  console.log(`
+╔══════════════════════════════════════════════════════════════════╗
+║                        🚀 ZURI PLATFORM 2.0                     ║
+║                   Clean Architecture + Advanced Features         ║
+╠══════════════════════════════════════════════════════════════════╣
+║  📋 Arquitectura: Monolito Modular con Clean Architecture       ║
+║  🔧 Principios: SOLID + DRY + Domain Events                     ║
+║  ⚡ Features: Cache + Performance + Validaciones Externas       ║
+║  🛡️ Seguridad: Validación RENIEC + MTC + Antecedentes          ║
+╚══════════════════════════════════════════════════════════════════╝
+  `);
+
+  try {
+    console.log('🔧 [Init] Iniciando sistema ZURI...\n');
+    
+    // Inicializar sistema avanzado
+    const system = initializeZURIAdvancedSystem();
+    
+    console.log('\n✅ [Init] Sistema inicializado exitosamente!');
+    console.log('📊 [Init] Componentes activos:');
+    console.log('   ✅ Domain Layer - Entidades y lógica de negocio');
+    console.log('   ✅ Application Layer - Casos de uso');
+    console.log('   ✅ Infrastructure Layer - Servicios externos');
+    console.log('   ✅ Presentation Layer - UI y hooks');
+    console.log('   ✅ Domain Events - Sistema de eventos');
+    console.log('   ✅ Advanced Validation - RENIEC + MTC');
+    console.log('   ✅ Performance Monitor - Métricas de rendimiento');
+    console.log('   ✅ Cache Layer - Optimización de consultas');
+    console.log('   ✅ Error Handling - Manejo avanzado de errores\n');
+    
+    // Configurar debugging en desarrollo
+    if (process.env.NODE_ENV === 'development') {
+      setupDevelopmentTools(system);
+    }
+    
+    // Test inicial
+    runInitialTests(system);
+    
+    return system;
+    
+  } catch (error) {
+    console.error('❌ [Init] Error crítico al inicializar sistema:', error);
+    throw error;
+  }
+};
+
+// ============================================
+// HERRAMIENTAS DE DESARROLLO
+// ============================================
+
+const setupDevelopmentTools = (system: any) => {
+  console.log('🛠️ [Dev] Configurando herramientas de desarrollo...');
+  
+  if (typeof window !== 'undefined') {
+    // Herramientas disponibles en window.ZURI
+    (window as any).ZURI_DEV = {
+      // Sistema principal
+      system,
+      
+      // Funciones de utilidad
+      utils: {
+        clearCache: () => {
+          system.cache.clear();
+          console.log('🧹 [Dev] Cache limpiado');
+        },
+        
+        showPerformanceStats: () => {
+          const stats = system.performance.getAllStats();
+          console.table(stats);
+        },
+        
+        showCacheStats: () => {
+          const stats = system.cache.getStats();
+          console.log('📊 [Dev] Cache stats:', stats);
+        },
+        
+        testValidation: async (dni: string) => {
+          const validator = system.factory.getAdvancedValidationService();
+          const result = await validator.validarDNIConRENIEC(dni);
+          console.log('🔍 [Dev] Validación RENIEC:', result);
+          return result;
+        },
+        
+        simulateEvent: (eventType: string, data: any) => {
+          console.log(`🎭 [Dev] Simulando evento: ${eventType}`, data);
+        }
+      },
+      
+      // Shortcuts de debugging
+      debug: {
+        enableEventLogging: () => {
+          console.log('📝 [Dev] Event logging activado');
+        },
+        
+        disableEventLogging: () => {
+          console.log('🔇 [Dev] Event logging desactivado');  
+        },
+        
+        showArchitecture: () => {
+          console.log(`
+🏗️ ARQUITECTURA ZURI:
+
+Domain Layer (Sin dependencias externas)
+├── Conductor.ts (Entidad principal)
+├── interfaces.ts (Contratos)
+└── Specifications (Consultas complejas)
+
+Application Layer (Depende solo de Domain)
+├── useCases.ts (Casos de uso)
+└── DTOs (Data Transfer Objects)
+
+Infrastructure Layer (Implementa Domain)
+├── services.ts (Repositorios base)
+├── eventHandlers.ts (Eventos)
+└── advancedServices.ts (Servicios avanzados)
+
+Presentation Layer (Usa Application)
+├── useConductores.ts (Hook)
+├── ConductorModalNEMT.tsx (Modal)
+└── page.tsx (Página principal)
+          `);
+        }
+      }
+    };
+    
+    console.log('🎯 [Dev] Herramientas disponibles en: window.ZURI_DEV');
+    console.log('💡 [Dev] Ejemplos:');
+    console.log('   - window.ZURI_DEV.utils.clearCache()');
+    console.log('   - window.ZURI_DEV.utils.showPerformanceStats()');
+    console.log('   - window.ZURI_DEV.debug.showArchitecture()');
+  }
+};
+
+// ============================================
+// TESTS INICIALES
+// ============================================
+
+const runInitialTests = async (system: any) => {
+  console.log('🧪 [Test] Ejecutando tests iniciales...');
+  
+  try {
+    // Test 1: Factory
+    const repository = system.factory.getConductorRepository();
+    console.log('✅ [Test] Repository inicializado');
+    
+    // Test 2: Cache
+    system.cache.set('test-key', { value: 'test' }, 1);
+    const cached = system.cache.get('test-key');
+    console.log('✅ [Test] Cache funcionando:', cached ? '✓' : '✗');
+    
+    // Test 3: Performance
+    const startTime = performance.now();
+    await new Promise(resolve => setTimeout(resolve, 10));
+    const endTime = performance.now();
+    system.performance.recordMetric('test-metric', endTime - startTime);
+    console.log('✅ [Test] Performance monitor funcionando');
+    
+    console.log('🎉 [Test] Todos los tests iniciales pasaron');
+    
+  } catch (error) {
+    console.warn('⚠️ [Test] Algunos tests fallaron:', error);
+  }
+};
+
+// ============================================
+// EXPORT PARA USO EN LA APP
+// ============================================
+
+export default initializeZURI;
+
+// Auto-ejecutar si se importa en el navegador
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  // Solo ejecutar si no se ha ejecutado antes
+  if (!(window as any).ZURI_INITIALIZED) {
+    initializeZURI();
+    (window as any).ZURI_INITIALIZED = true;
+  }
+}

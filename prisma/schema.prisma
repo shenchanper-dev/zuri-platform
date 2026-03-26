@@ -116,6 +116,7 @@ model Conductor {
   marcaAuto                  String?  @db.VarChar(50)
   modelo                     String?  @db.VarChar(50)
   propietario                String?  @db.VarChar(100)
+  colorAuto                  String?  @db.VarChar(30)
   fecha_asignacion           DateTime? @db.Date
   
   // ========================================
@@ -179,6 +180,19 @@ model Conductor {
   updatedAt                  DateTime @updatedAt
   creadoPor                  String?  @db.VarChar(100)
   modificadoPor              String?  @db.VarChar(100)
+  
+  // ========================================
+  // MOBILE APP (Autenticación y Dispositivo)
+  // ========================================
+  pin_hash                   String?  @db.VarChar(255)
+  biometria_enabled          Boolean  @default(false)
+  device_token               String?  @db.VarChar(255)  // FCM/APNS
+  device_id                  String?  @db.VarChar(100)
+  device_platform            String?  @db.VarChar(20)   // ios/android
+  app_version                String?  @db.VarChar(20)
+  ultimo_login               DateTime?
+  intentos_fallidos          Int      @default(0)
+  bloqueado_hasta            DateTime?
   
   // ========================================
   // RELACIONES PARA TRACKING

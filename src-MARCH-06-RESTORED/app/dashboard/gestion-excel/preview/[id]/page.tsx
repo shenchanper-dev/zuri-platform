@@ -1,0 +1,16 @@
+import { Suspense } from 'react';
+import ExcelPreviewComponent from '@/components/ExcelPreviewComponent';
+
+export default function ExcelPreviewPage({ params }: { params: { id: string } }) {
+    const importacionId = parseInt(params.id);
+
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            </div>
+        }>
+            <ExcelPreviewComponent importacionId={importacionId} />
+        </Suspense>
+    );
+}

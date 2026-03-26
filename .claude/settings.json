@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"POST.*location\\\\|location.*route\\\\|driver.*client\\\\|mobile\\\\|app.ts\\\\|index.ts\" /home/zuri/zuri-platform/src/app/api/drivers --include=*.ts)",
+      "Bash(find /home/zuri/zuri-platform -name README* -o -name INTEGRATION* -o -name API*)"
+    ]
+  }
+}

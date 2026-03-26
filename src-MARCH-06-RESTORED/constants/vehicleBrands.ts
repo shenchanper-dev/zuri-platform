@@ -1,0 +1,48 @@
+// src/constants/vehicleBrands.ts
+// Vehicle brands most sold in Peru market
+
+export const VEHICLE_BRANDS_PERU = [
+    'Toyota',
+    'Nissan',
+    'BYD',
+    'Hyundai',
+    'Kia',
+    'Changan',
+    'Chevrolet',
+    'DFSK',
+    'JAC',
+    'Suzuki',
+    'Chery',
+    'Geely',
+    'Jetour',
+    'Great Wall (GWM / Haval / Poer)',
+    'Mitsubishi',
+    'Ford',
+    'MG (Morris Garages)',
+    'Volkswagen',
+    'Mazda',
+    'Renault',
+    'Honda',
+    'Subaru',
+    'GAC Motor',
+    'Dongfeng',
+    'BMW',
+    'Mercedes-Benz',
+    'Audi',
+    'Volvo',
+    'Peugeot',
+    'Foton',
+    'Jeep',
+    'Shineray',
+    'JMC',
+    'Citroën',
+    'Maxus',
+    'Land Rover',
+    'Porsche',
+    'Soueast',
+    'Karry',
+    'KYC',
+    'Otros'
+] as const;
+
+export type VehicleBrand = typeof VEHICLE_BRANDS_PERU[number];

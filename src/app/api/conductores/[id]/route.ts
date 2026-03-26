@@ -1,126 +1,104 @@
 // src/app/api/conductores/[id]/route.ts
-// OPERACIONES INDIVIDUALES CONDUCTORES - LIMPIO SIN DUPLICACIONES
-// ✅ Solo nombres y apellidos como campos separados
-// ✅ nombreCompleto se genera automáticamente
+// OPERACIONES INDIVIDUALES - CORREGIDO CON NOMBRES EXACTOS DE BD
+// ✅ Verificado contra tabla real PostgreSQL
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Client } from 'pg';
+import pool from '@/lib/pg-pool';
 
-const dbConfig = {
-  connectionString: 'postgresql://postgres@localhost:5432/zuri_db'
-};
 
 // GET: Obtener conductor por ID
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  let client: Client | null = null;
-  
+  let client: any = null;
+
   try {
     const id = parseInt(params.id);
-    console.log(`🔍 [GET] Obteniendo conductor ID: ${id}`);
-
     if (isNaN(id)) {
-      return NextResponse.json(
-        { error: 'ID inválido', success: false },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'ID inválido', success: false }, { status: 400 });
     }
 
-    client = new Client(dbConfig);
-    await client.connect();
+    client = await pool.connect();
 
-    // ✅ Query usando nombres de columnas EXACTOS como están en tu BD
     const query = `
       SELECT 
-        id, dni, nombres, apellidos, "fechaNacimiento", foto, celular1, celular2,
-        email, "estadoCivil", "numeroHijos", "domicilioCompleto", "domicilioDistrito",
-        "domicilioLatitud", "domicilioLongitud", "nombreContactoEmergencia",
-        "celularContactoEmergencia", "numeroBrevete", "fechaVencimientoBrevete",
-        "marcaVehiculo", "modeloVehiculo", placa, "añoVehiculo", "capacidadPasajeros",
-        "tipoVehiculo", estado, observaciones, "fechaIngreso",
-        "ubicacionActualLatitud", "ubicacionActualLongitud", "ultimaActualizacionGPS",
-        "precisionGPS", "velocidadActual", "rumboActual", "nivelBateria",
-        "estaConectado", "ultimaConexion", "modoTracking", "createdAt", "updatedAt"
-      FROM conductores 
-      WHERE id = $1
+        c.*,
+        d.nombre as distrito_nombre
+      FROM conductores c
+      LEFT JOIN distritos d ON c."distritoId" = d.id
+      WHERE c.id = $1
     `;
 
     const result = await client.query(query, [id]);
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Conductor no encontrado', success: false },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Conductor no encontrado', success: false }, { status: 404 });
     }
 
     const row = result.rows[0];
-    
-    // ✅ Mapeo SIMPLE - solo concatenar nombres + apellidos
+
+    const normalizeUrl = (url: string | null) => {
+      if (!url) return null;
+      if (url.startsWith('/uploads/')) return `/api${url}`;
+      return url;
+    };
+
+    const splitNombreCompleto = (full: string | null) => {
+      const text = (full || '').trim();
+      if (!text) return { nombres: '', apellidos: '' };
+      const parts = text.split(/\s+/);
+      if (parts.length === 1) return { nombres: parts[0], apellidos: '' };
+      return { nombres: parts.slice(0, 1).join(' '), apellidos: parts.slice(1).join(' ') };
+    };
+
+    const derived = splitNombreCompleto(row.nombreCompleto || null);
+
     const conductor = {
       id: row.id,
       dni: row.dni,
-      nombres: row.nombres,
-      apellidos: row.apellidos,
-      nombreCompleto: `${row.nombres} ${row.apellidos}`.trim(), // ✅ SIMPLE
+      nombres: row.nombres ?? derived.nombres,
+      apellidos: row.apellidos ?? derived.apellidos,
+      nombreCompleto: row.nombreCompleto || `${row.nombres || ''} ${row.apellidos || ''}`.trim(),
+      foto: normalizeUrl(row.foto),
       fechaNacimiento: row.fechaNacimiento ? new Date(row.fechaNacimiento).toISOString().split('T')[0] : null,
-      foto: row.foto,
+      sexo: row.sexo,
       celular1: row.celular1,
       celular2: row.celular2,
       email: row.email,
       estadoCivil: row.estadoCivil,
-      numeroHijos: row.numeroHijos || 0,
-      domicilioCompleto: row.domicilioCompleto,
-      domicilioDistrito: row.domicilioDistrito,
-      domicilioLatitud: row.domicilioLatitud ? parseFloat(row.domicilioLatitud) : null,
-      domicilioLongitud: row.domicilioLongitud ? parseFloat(row.domicilioLongitud) : null,
+      numeroHijos: row.numeroHijos,
+      domicilioCompleto: row.domicilioCompleto || row.direccion,
+      distritoId: row.distritoId,
+      distrito_nombre: row.distrito_nombre,
       nombreContactoEmergencia: row.nombreContactoEmergencia,
       celularContactoEmergencia: row.celularContactoEmergencia,
       numeroBrevete: row.numeroBrevete,
+      licencia_categoria: row.licencia_categoria,
       fechaVencimientoBrevete: row.fechaVencimientoBrevete ? new Date(row.fechaVencimientoBrevete).toISOString().split('T')[0] : null,
       marcaVehiculo: row.marcaVehiculo,
       modeloVehiculo: row.modeloVehiculo,
       placa: row.placa,
-      numeroPlaca: row.placa, // ✅ Mapeo para frontend
-      añoVehiculo: row.añoVehiculo,
-      capacidadPasajeros: row.capacidadPasajeros || 4,
-      tipoVehiculo: row.tipoVehiculo || 'SEDAN',
-      estado: row.estado || 'ACTIVO',
+      tipoVehiculo: row.tipoVehiculo,
+      colorVehiculo: row.colorVehiculo || row.colorAuto,
+      fotoVehiculo: normalizeUrl(row.fotoVehiculo),
+      estado: row.estado,
       observaciones: row.observaciones,
-      fechaIngreso: row.fechaIngreso ? new Date(row.fechaIngreso).toISOString().split('T')[0] : null,
-      ubicacionActualLatitud: row.ubicacionActualLatitud ? parseFloat(row.ubicacionActualLatitud) : null,
-      ubicacionActualLongitud: row.ubicacionActualLongitud ? parseFloat(row.ubicacionActualLongitud) : null,
-      ultimaActualizacionGPS: row.ultimaActualizacionGPS ? new Date(row.ultimaActualizacionGPS).toISOString() : null,
-      precisionGPS: row.precisionGPS ? parseFloat(row.precisionGPS) : null,
-      velocidadActual: row.velocidadActual ? parseFloat(row.velocidadActual) : 0,
-      rumboActual: row.rumboActual || 0,
-      nivelBateria: row.nivelBateria || 100,
-      estaConectado: row.estaConectado || false,
-      ultimaConexion: row.ultimaConexion ? new Date(row.ultimaConexion).toISOString() : null,
-      modoTracking: row.modoTracking || 'MANUAL',
-      createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : null,
-      updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : null
+      certificacionMedica: row.certificado_medico,
+      antecedentesPenales: row.antecedentes_penales,
+      equipamiento: row.equipamiento_nemt && row.equipamiento_nemt !== '[]' ? JSON.parse(row.equipamiento_nemt) : [],
+      servicios: row.servicios_habilitados && row.servicios_habilitados !== '[]' ? JSON.parse(row.servicios_habilitados) : [],
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt
     };
 
-    console.log(`✅ [GET] Conductor encontrado: ${conductor.nombreCompleto}, foto: ${conductor.foto ? 'SÍ' : 'NO'}`);
+    return NextResponse.json({ conductor, success: true });
 
-    return NextResponse.json({
-      conductor,
-      success: true
-    });
-
-  } catch (error) {
-    console.error('❌ [GET] Error al obtener conductor:', error);
-    return NextResponse.json(
-      { error: `Error interno: ${error.message}`, success: false },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    console.error('❌ [GET Conductor ID] Error:', error);
+    return NextResponse.json({ error: error.message, success: false }, { status: 500 });
   } finally {
-    if (client) {
-      await client.end();
-    }
+    if (client) client.release();
   }
 }
 
@@ -129,249 +107,354 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  let client = null;
+  let client: any = null;
+
   try {
-    console.log(`🔄 [PUT] Actualizando conductor ID: ${params.id}`);
-    
-    const { Client } = await import('pg');
     const id = parseInt(params.id);
-    const body = await request.json();
-
     if (isNaN(id)) {
-      return NextResponse.json(
-        { error: 'ID inválido', success: false },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'ID inválido', success: false }, { status: 400 });
     }
 
-    client = new Client({
-      connectionString: 'postgresql://postgres@localhost:5432/zuri_db'
-    });
+    const contentType = request.headers.get('content-type') || '';
+    let body: any = {};
+    let files: Record<string, File> = {};
 
-    await client.connect();
-
-    // ✅ OBTENER DATOS ACTUALES PRIMERO
-    const currentResult = await client.query(
-      'SELECT * FROM conductores WHERE id = $1',
-      [id]
-    );
-
-    if (currentResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Conductor no encontrado', success: false },
-        { status: 404 }
-      );
-    }
-
-    const currentData = currentResult.rows[0];
-
-    // ✅ PROCESAR nombreCompleto SI viene del frontend
-    let nombres, apellidos;
-    
-    if (body.nombreCompleto && !body.nombres && !body.apellidos) {
-      const partes = body.nombreCompleto.trim().split(' ');
-      nombres = partes[0] || '';
-      apellidos = partes.slice(1).join(' ') || '';
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      formData.forEach((value, key) => {
+        if (value instanceof File) {
+          files[key] = value;
+        } else {
+          body[key] = value.toString();
+        }
+      });
     } else {
-      nombres = body.nombres !== undefined ? body.nombres : currentData.nombres;
-      apellidos = body.apellidos !== undefined ? body.apellidos : currentData.apellidos;
+      body = await request.json();
     }
 
-    // ✅ PROCESAR FOTO
-    let fotoData = currentData.foto;
-    if (body.foto !== undefined) {
-      fotoData = body.foto;
+    // Verificar qué llegó del frontend (solo en desarrollo)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('📸 [PUT DEBUG] Content-Type:', contentType, '| foto?', !!body.foto, '| fotoVehiculo?', !!body.fotoVehiculo);
     }
 
-    // ✅ UPDATE con 37 campos exactos + WHERE ($38)
-    const result = await client.query(`
-      UPDATE conductores SET
-        dni = $1,
-        nombres = $2,
-        apellidos = $3,
-        "fechaNacimiento" = $4,
-        foto = $5,
-        celular1 = $6,
-        celular2 = $7,
-        email = $8,
-        "estadoCivil" = $9,
-        "numeroHijos" = $10,
-        "domicilioCompleto" = $11,
-        "domicilioDistrito" = $12,
-        "domicilioLatitud" = $13,
-        "domicilioLongitud" = $14,
-        "nombreContactoEmergencia" = $15,
-        "celularContactoEmergencia" = $16,
-        "numeroBrevete" = $17,
-        "fechaVencimientoBrevete" = $18,
-        "marcaVehiculo" = $19,
-        "modeloVehiculo" = $20,
-        placa = $21,
-        "añoVehiculo" = $22,
-        "capacidadPasajeros" = $23,
-        "tipoVehiculo" = $24,
-        estado = $25,
-        observaciones = $26,
-        "fechaIngreso" = $27,
-        "ubicacionActualLatitud" = $28,
-        "ubicacionActualLongitud" = $29,
-        "ultimaActualizacionGPS" = $30,
-        "precisionGPS" = $31,
-        "velocidadActual" = $32,
-        "rumboActual" = $33,
-        "nivelBateria" = $34,
-        "estaConectado" = $35,
-        "ultimaConexion" = $36,
-        "modoTracking" = $37,
-        "updatedAt" = NOW()
-      WHERE id = $38
-      RETURNING *
-    `, [
-      body.dni !== undefined ? body.dni : currentData.dni,                    // $1
-      nombres,                                                                // $2
-      apellidos,                                                              // $3
-      body.fechaNacimiento !== undefined ? body.fechaNacimiento : currentData.fechaNacimiento, // $4
-      fotoData,                                                              // $5
-      body.celular1 !== undefined ? body.celular1 : currentData.celular1,    // $6
-      body.celular2 !== undefined ? body.celular2 : currentData.celular2,    // $7
-      body.email !== undefined ? body.email : currentData.email,             // $8
-      body.estadoCivil !== undefined ? body.estadoCivil : currentData.estadoCivil, // $9
-      body.numeroHijos !== undefined ? body.numeroHijos : currentData.numeroHijos, // $10
-      body.domicilioCompleto !== undefined ? body.domicilioCompleto : currentData.domicilioCompleto, // $11
-      body.domicilioDistrito !== undefined ? body.domicilioDistrito : currentData.domicilioDistrito, // $12
-      body.domicilioLatitud !== undefined ? body.domicilioLatitud : currentData.domicilioLatitud, // $13
-      body.domicilioLongitud !== undefined ? body.domicilioLongitud : currentData.domicilioLongitud, // $14
-      body.nombreContactoEmergencia !== undefined ? body.nombreContactoEmergencia : currentData.nombreContactoEmergencia, // $15
-      body.celularContactoEmergencia !== undefined ? body.celularContactoEmergencia : currentData.celularContactoEmergencia, // $16
-      body.numeroBrevete !== undefined ? body.numeroBrevete : currentData.numeroBrevete, // $17
-      body.fechaVencimientoBrevete !== undefined ? body.fechaVencimientoBrevete : currentData.fechaVencimientoBrevete, // $18
-      body.marcaVehiculo !== undefined ? body.marcaVehiculo : currentData.marcaVehiculo, // $19
-      body.modeloVehiculo !== undefined ? body.modeloVehiculo : currentData.modeloVehiculo, // $20
-      body.placa !== undefined ? body.placa : (body.numeroPlaca !== undefined ? body.numeroPlaca : currentData.placa), // $21
-      body.añoVehiculo !== undefined ? body.añoVehiculo : currentData.añoVehiculo, // $22
-      body.capacidadPasajeros !== undefined ? body.capacidadPasajeros : currentData.capacidadPasajeros, // $23
-      body.tipoVehiculo !== undefined ? body.tipoVehiculo : currentData.tipoVehiculo, // $24
-      body.estado !== undefined ? body.estado : currentData.estado,           // $25
-      body.observaciones !== undefined ? body.observaciones : currentData.observaciones, // $26
-      body.fechaIngreso !== undefined ? body.fechaIngreso : currentData.fechaIngreso, // $27
-      body.ubicacionActualLatitud !== undefined ? body.ubicacionActualLatitud : currentData.ubicacionActualLatitud, // $28
-      body.ubicacionActualLongitud !== undefined ? body.ubicacionActualLongitud : currentData.ubicacionActualLongitud, // $29
-      body.ultimaActualizacionGPS !== undefined ? body.ultimaActualizacionGPS : currentData.ultimaActualizacionGPS, // $30
-      body.precisionGPS !== undefined ? body.precisionGPS : currentData.precisionGPS, // $31
-      body.velocidadActual !== undefined ? body.velocidadActual : currentData.velocidadActual, // $32
-      body.rumboActual !== undefined ? body.rumboActual : currentData.rumboActual, // $33
-      body.nivelBateria !== undefined ? body.nivelBateria : currentData.nivelBateria, // $34
-      body.estaConectado !== undefined ? body.estaConectado : currentData.estaConectado, // $35
-      body.ultimaConexion !== undefined ? body.ultimaConexion : currentData.ultimaConexion, // $36
-      body.modoTracking !== undefined ? body.modoTracking : currentData.modoTracking, // $37
-      id                                                                     // $38
-    ]);
+    client = await pool.connect();
 
-    const conductor = result.rows[0];
-    
-    console.log(`✅ [PUT] Conductor actualizado ID: ${id}, foto: ${conductor.foto ? 'SÍ' : 'NO'}`);
+    // Obtener datos actuales
+    const current = await client.query('SELECT * FROM conductores WHERE id = $1', [id]);
+    if (current.rows.length === 0) {
+      return NextResponse.json({ error: 'Conductor no encontrado', success: false }, { status: 404 });
+    }
+    const currentData = current.rows[0];
 
-    // ✅ MAPEO SIMPLE PARA FRONTEND
-    const conductorMapeado = {
-      id: conductor.id,
-      dni: conductor.dni,
-      nombres: conductor.nombres,
-      apellidos: conductor.apellidos,
-      nombreCompleto: `${conductor.nombres} ${conductor.apellidos}`.trim(), // ✅ SIMPLE
-      fechaNacimiento: conductor.fechaNacimiento ? new Date(conductor.fechaNacimiento).toISOString().split('T')[0] : null,
-      foto: conductor.foto,
-      celular1: conductor.celular1,
-      celular2: conductor.celular2,
-      email: conductor.email,
-      domicilioCompleto: conductor.domicilioCompleto,
-      numeroBrevete: conductor.numeroBrevete,
-      marcaVehiculo: conductor.marcaVehiculo,
-      modeloVehiculo: conductor.modeloVehiculo,
-      placa: conductor.placa,
-      numeroPlaca: conductor.placa, // ✅ Mapeo frontend
-      estado: conductor.estado,
-      estaConectado: conductor.estaConectado,
-      createdAt: conductor.createdAt ? new Date(conductor.createdAt).toISOString() : null,
-      updatedAt: conductor.updatedAt ? new Date(conductor.updatedAt).toISOString() : null
+    // 🚀 FIX CRÍTICO: Evitar que strings vacíos o 'null' borren la foto existente
+    const isValidValue = (val: any) => val !== undefined && val !== null && val !== '' && val !== 'null' && val !== 'undefined';
+
+    // Si recibimos Base64 o URL, la usamos. Si no, mantenemos la actual.
+    let foto = isValidValue(body.foto) ? body.foto : currentData.foto;
+    let fotoVehiculo = isValidValue(body.fotoVehiculo) ? body.fotoVehiculo : currentData.fotoVehiculo;
+
+    // Validar distritoId - si no existe en la BD, usar el valor actual o NULL
+    let distritoIdValido: number | null = currentData.distritoId;
+    if (body.distritoId !== undefined && body.distritoId !== null && body.distritoId !== '') {
+      const distritoCheck = await client.query('SELECT id FROM distritos WHERE id = $1', [parseInt(body.distritoId)]);
+      if (distritoCheck.rows.length > 0) {
+        distritoIdValido = parseInt(body.distritoId);
+      } else {
+        console.log(`⚠️ [API-Conductores PUT] distritoId ${body.distritoId} no existe, manteniendo valor actual`);
+      }
+    }
+
+    const colorVehiculo = body.colorVehiculo || body.colorAuto || currentData.colorVehiculo || currentData.colorAuto;
+
+    const colsRes = await client.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'conductores'
+      `
+    );
+    const colMap = new Map<string, string>();
+    for (const r of colsRes.rows || []) {
+      const name = String(r.column_name);
+      colMap.set(name.toLowerCase(), name);
+    }
+    const cols = new Set<string>((colsRes.rows || []).map((r: any) => String(r.column_name).toLowerCase()));
+    const hasNombres = cols.has('nombres');
+    const hasApellidos = cols.has('apellidos');
+    const hasNombreCompleto = cols.has('nombrecompleto');
+    const hasFoto = cols.has('foto');
+    const hasFotoUrl = cols.has('foto_url');
+    const hasFotoVehiculo = cols.has('fotovehiculo') || cols.has('foto_vehiculo');
+    const hasFechaNacimiento = cols.has('fechanacimiento') || cols.has('fecha_nacimiento');
+    const hasEstadoRegistro = cols.has('estado_registro');
+
+    const colIdent = (name: string) => {
+      const actual = colMap.get(name.toLowerCase());
+      if (!actual) return null;
+      return `"${actual.replace(/"/g, '""')}"`;
     };
 
+    const nombresVal = body.nombres ?? currentData.nombres ?? '';
+    const apellidosVal = body.apellidos ?? currentData.apellidos ?? '';
+    const nombreCompletoVal =
+      body.nombreCompleto ?? currentData.nombreCompleto ?? `${nombresVal} ${apellidosVal}`.trim();
+
+    const marcaVehiculo = body.marcaVehiculo || currentData.marcaVehiculo;
+    const modeloVehiculo = body.modeloVehiculo || currentData.modeloVehiculo;
+    const estadoVal = body.estado || currentData.estado;
+
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    const push = (sql: string, value: any) => {
+      values.push(value);
+      updates.push(`${sql} = $${values.length}`);
+    };
+
+    const pushCol = (name: string, value: any) => {
+      const ident = colIdent(name);
+      if (!ident) return false;
+      push(ident, value);
+      return true;
+    };
+
+    push('dni', body.dni || currentData.dni);
+    if (hasNombres) push('nombres', nombresVal);
+    if (hasApellidos) push('apellidos', apellidosVal);
+    if (hasNombreCompleto) pushCol('nombreCompleto', nombreCompletoVal);
+    if (hasFechaNacimiento) pushCol('fechaNacimiento', body.fechaNacimiento || currentData.fechaNacimiento);
+    if (hasFoto) push('foto', foto);
+    if (hasFotoUrl && foto && !foto.startsWith('data:')) push('foto_url', foto);
+    push('celular1', body.celular1 || currentData.celular1);
+    push('celular2', body.celular2 || currentData.celular2);
+    push('email', body.email || currentData.email);
+    pushCol('estadoCivil', body.estadoCivil || currentData.estadoCivil);
+    pushCol('numeroHijos', body.numeroHijos ? parseInt(body.numeroHijos) : currentData.numeroHijos);
+    {
+      const domicilioVal =
+        body.domicilioCompleto ||
+        body.direccion ||
+        currentData.domicilioCompleto ||
+        currentData.direccion ||
+        currentData.domicilio ||
+        null;
+      pushCol('domicilioCompleto', domicilioVal) || pushCol('direccion', domicilioVal) || pushCol('domicilio', domicilioVal);
+    }
+    pushCol('distritoId', distritoIdValido);
+    {
+      const nombreContactoVal = body.nombreContactoEmergencia || currentData.nombreContactoEmergencia || null;
+      pushCol('nombreContactoEmergencia', nombreContactoVal) || pushCol('contacto_emergencia_nombre', nombreContactoVal) || pushCol('nombreContacto', nombreContactoVal);
+    }
+    {
+      const celularContactoVal = body.celularContactoEmergencia || currentData.celularContactoEmergencia || null;
+      pushCol('celularContactoEmergencia', celularContactoVal) || pushCol('contacto_emergencia_telefono', celularContactoVal) || pushCol('celularContacto', celularContactoVal);
+    }
+    {
+      const numeroBreveteVal = body.numeroBrevete || currentData.numeroBrevete || null;
+      pushCol('numeroBrevete', numeroBreveteVal) || pushCol('licencia_numero', numeroBreveteVal);
+    }
+    {
+      const fechaVencVal = body.fechaVencimientoBrevete || currentData.fechaVencimientoBrevete || null;
+      pushCol('fechaVencimientoBrevete', fechaVencVal) || pushCol('fecha_vencimiento_licencia', fechaVencVal);
+    }
+    pushCol('marcaVehiculo', marcaVehiculo);
+    pushCol('marca_vehiculo', marcaVehiculo);
+    pushCol('modeloVehiculo', modeloVehiculo);
+    pushCol('modelo_vehiculo', modeloVehiculo);
+    push('placa', body.placa || currentData.placa);
+    {
+      const tipoVehiculoVal = body.tipoVehiculo || currentData.tipoVehiculo || null;
+      pushCol('tipoVehiculo', tipoVehiculoVal) || pushCol('tipo_vehiculo', tipoVehiculoVal);
+    }
+
+    if (hasEstadoRegistro) {
+      values.push(estadoVal);
+      updates.push(`estado_registro = CASE WHEN $${values.length} = 'ACTIVO' THEN 'APROBADO' ELSE estado_registro END`);
+    }
+    values.push(estadoVal);
+    updates.push(`estado = $${values.length}::"EstadoConductor"`);
+
+    push('observaciones', body.observaciones || currentData.observaciones);
+    pushCol('sexo', body.sexo || currentData.sexo);
+    pushCol('colorAuto', colorVehiculo) || pushCol('color_auto', colorVehiculo);
+    pushCol('color_vehiculo', colorVehiculo);
+    pushCol('colorVehiculo', colorVehiculo);
+    pushCol('fotoVehiculo', fotoVehiculo) || pushCol('foto_vehiculo', fotoVehiculo);
+    {
+      const certMedVal = body.certificacionMedica === 'true' || body.certificacionMedica === true || currentData.certificado_medico;
+      pushCol('certificado_medico', certMedVal) || pushCol('certificacionMedica', certMedVal);
+    }
+    {
+      const antecedentesVal = body.antecedentesPenales === 'true' || body.antecedentesPenales === true || currentData.antecedentes_penales;
+      pushCol('antecedentes_penales', antecedentesVal) || pushCol('antecedentesPenales', antecedentesVal);
+    }
+    {
+      const licenciaCatVal = body.licencia_categoria || currentData.licencia_categoria || null;
+      pushCol('licencia_categoria', licenciaCatVal) || pushCol('licenciaCategoria', licenciaCatVal);
+    }
+    {
+      const equipVal = body.equipamiento
+        ? (typeof body.equipamiento === 'string' ? body.equipamiento : JSON.stringify(body.equipamiento))
+        : currentData.equipamiento_nemt;
+      pushCol('equipamiento_nemt', equipVal) || pushCol('equipamientoNemt', equipVal);
+    }
+    {
+      const servVal = body.servicios
+        ? (typeof body.servicios === 'string' ? body.servicios : JSON.stringify(body.servicios))
+        : currentData.servicios_habilitados;
+      pushCol('servicios_habilitados', servVal) || pushCol('serviciosHabilitados', servVal);
+    }
+    {
+      const waVal = body.whatsapp_number ?? currentData.whatsapp_number ?? null;
+      pushCol('whatsapp_number', waVal) || pushCol('whatsappNumber', waVal);
+    }
+    updates.push(`"updatedAt" = NOW()`);
+
+    values.push(id);
+    const updateQuery = `
+      UPDATE conductores SET
+        ${updates.join(',\n        ')}
+      WHERE id = $${values.length}
+      RETURNING *
+    `;
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`📸 [PUT DEBUG] Conductor ${id} | foto?`, !!foto, '| fotoVehiculo?', !!fotoVehiculo);
+    }
+
+    const result = await client.query(updateQuery, values);
+    const row = result.rows[0];
+
+    // 🔔 TRIGGER: Si el estado cambió a ACTIVO, notificar al conductor por email
+    const estadoAnterior = currentData.estado;
+    const estadoNuevo = body.estado || currentData.estado;
+    if (estadoAnterior !== 'ACTIVO' && estadoNuevo === 'ACTIVO' && row.email) {
+      const nombreCompleto = `${row.nombres || ''} ${row.apellidos || ''}`.trim();
+      import('@/lib/notifications').then(({ sendApprovalNotification }) => {
+        sendApprovalNotification(
+          nombreCompleto,
+          row.email,
+          row.celular1 || ''
+        ).catch((err: Error) =>
+          console.error('❌ [PUT Conductor] Approval email error:', err.message)
+        );
+      });
+      console.log(`✅ [PUT Conductor] Email de aprobación enviado a ${row.email}`);
+    }
+
+    // Mapear el objeto completo para devolverlo (igual que el GET)
+    const normalizeUrl = (url: string | null) => {
+      if (!url) return null;
+      if (url.startsWith('/uploads/')) return `/api${url}`;
+      return url;
+    };
+
+    const conductor = {
+      id: row.id,
+      dni: row.dni,
+      nombres: row.nombres,
+      apellidos: row.apellidos,
+      nombreCompleto: row.nombreCompleto || `${row.nombres || ''} ${row.apellidos || ''}`.trim(),
+      foto: normalizeUrl(row.foto),
+      fechaNacimiento: row.fechaNacimiento ? new Date(row.fechaNacimiento).toISOString().split('T')[0] : null,
+      sexo: row.sexo,
+      celular1: row.celular1,
+      celular2: row.celular2,
+      email: row.email,
+      estadoCivil: row.estadoCivil,
+      numeroHijos: row.numeroHijos,
+      domicilioCompleto: row.domicilioCompleto || row.direccion,
+      distritoId: row.distritoId,
+      nombreContactoEmergencia: row.nombreContactoEmergencia,
+      celularContactoEmergencia: row.celularContactoEmergencia,
+      numeroBrevete: row.numeroBrevete,
+      licencia_categoria: row.licencia_categoria,
+      fechaVencimientoBrevete: row.fechaVencimientoBrevete ? new Date(row.fechaVencimientoBrevete).toISOString().split('T')[0] : null,
+      marcaVehiculo: row.marcaVehiculo,
+      modeloVehiculo: row.modeloVehiculo,
+      placa: row.placa,
+      tipoVehiculo: row.tipoVehiculo,
+      colorVehiculo: row.colorVehiculo || row.colorAuto,
+      fotoVehiculo: normalizeUrl(row.fotoVehiculo),
+      estado: row.estado,
+      observations: row.observaciones,
+      certificacionMedica: row.certificado_medico,
+      antecedentesPenales: row.antecedentes_penales,
+      equipamiento: row.equipamiento_nemt && row.equipamiento_nemt !== '[]' ? JSON.parse(row.equipamiento_nemt) : [],
+      servicios: row.servicios_habilitados && row.servicios_habilitados !== '[]' ? JSON.parse(row.servicios_habilitados) : [],
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt
+    };
+
+    console.log(`✅ [PUT Conductor] Actualizado completo: ${conductor.nombreCompleto} (ID: ${id})`);
+
     return NextResponse.json({
-      conductor: conductorMapeado,
       success: true,
-      message: 'Conductor actualizado correctamente'
+      conductor,
+      message: `Conductor ${conductor.nombreCompleto} actualizado exitosamente`
     });
 
-  } catch (error) {
-    console.error('❌ [PUT] Error actualizando conductor:', error);
-    return NextResponse.json({
-      error: `Error interno: ${error.message}`,
-      success: false
-    }, { status: 500 });
+  } catch (error: any) {
+    console.error('❌ [PUT Conductor] Error:', error);
+    return NextResponse.json({ error: error.message, success: false, detalles: error.detail }, { status: 500 });
   } finally {
-    if (client) {
-      await client.end();
-    }
+    if (client) client.release();
   }
 }
 
-// DELETE: Eliminar conductor (soft delete)
+// DELETE: Eliminar físicamente un conductor
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  let client: Client | null = null;
-  
+  let client: any = null;
+
   try {
     const id = parseInt(params.id);
-    console.log(`🗑️ [DELETE] Eliminando conductor ID: ${id}`);
-
     if (isNaN(id)) {
-      return NextResponse.json(
-        { error: 'ID inválido', success: false },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'ID inválido', success: false }, { status: 400 });
     }
 
-    client = new Client(dbConfig);
-    await client.connect();
+    client = await pool.connect();
 
-    // Verificar que existe
-    const existsCheck = await client.query(
-      'SELECT id, nombres, apellidos, estado FROM conductores WHERE id = $1',
-      [id]
-    );
+    // Primero, obtener información del conductor para logging
+    const conductorInfo = await client.query(`
+      SELECT nombres, apellidos FROM conductores WHERE id = $1
+    `, [id]);
 
-    if (existsCheck.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Conductor no encontrado', success: false },
-        { status: 404 }
-      );
+    if (conductorInfo.rows.length === 0) {
+      return NextResponse.json({ error: 'Conductor no encontrado', success: false }, { status: 404 });
     }
 
-    const conductor = existsCheck.rows[0];
+    const conductor = conductorInfo.rows[0];
 
-    // ✅ Soft delete - cambiar estado
-    await client.query(
-      'UPDATE conductores SET estado = $1, "updatedAt" = NOW() WHERE id = $2',
-      ['ELIMINADO', id]
-    );
+    // Eliminar en transacción: desasociar TODAS las tablas dependientes antes de eliminar
+    // (las tablas con ON DELETE CASCADE se limpian solas; las NO ACTION deben nullearse manualmente)
+    await client.query('BEGIN');
+    // SET NULL en tablas con ON DELETE SET NULL
+    await client.query(`UPDATE programacion_detalles SET conductor_id = NULL WHERE conductor_id = $1`, [id]);
+    await client.query(`UPDATE solicitudes_servicios SET conductor_id = NULL WHERE conductor_id = $1`, [id]);
+    await client.query(`UPDATE servicios SET "conductorId" = NULL WHERE "conductorId" = $1`, [id]);
+    // SET NULL en toma_muestras (ON DELETE NO ACTION — bloquea el DELETE si no se nullea)
+    await client.query(`UPDATE toma_muestras SET conductor_id = NULL WHERE conductor_id = $1`, [id]);
+    // Las tablas con ON DELETE CASCADE se eliminan automáticamente:
+    // conductor_certificaciones_nemt, ubicaciones_conductores, conductor_documentos,
+    // ofertas_rechazadas, ubicaciones_conductor
+    await client.query(`DELETE FROM conductores WHERE id = $1`, [id]);
+    await client.query('COMMIT');
 
-    console.log(`✅ [DELETE] Conductor eliminado: ${conductor.nombres} ${conductor.apellidos}`);
+    console.log(`🗑️ [DELETE Conductor] Eliminado permanentemente: ${conductor.nombres} ${conductor.apellidos} (ID: ${id})`);
 
     return NextResponse.json({
       success: true,
-      message: 'Conductor eliminado exitosamente'
+      message: `Conductor ${conductor.nombres} ${conductor.apellidos} eliminado exitosamente`
     });
 
-  } catch (error) {
-    console.error('❌ [DELETE] Error al eliminar conductor:', error);
-    return NextResponse.json(
-      { error: `Error interno: ${error.message}`, success: false },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    if (client) await client.query('ROLLBACK').catch(() => { });
+    console.error('❌ [DELETE Conductor] Error:', error);
+    return NextResponse.json({ error: error.message, success: false }, { status: 500 });
   } finally {
-    if (client) {
-      await client.end();
-    }
+    if (client) client.release();
   }
 }
